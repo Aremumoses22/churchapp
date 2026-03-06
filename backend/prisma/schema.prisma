@@ -1,0 +1,1870 @@
+// ═══════════════════════════════════════════════════════════════
+// Church App — Prisma Schema
+// Phase 1: Foundation (Auth, Users, Churches)
+// ═══════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────────────
+// CHURCHES (multi-tenant)
+// ─────────────────────────────────────────────────────
+model Church {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String   @db.VarChar(255)
+  tagline       String?  @db.VarChar(500)
+  code          String   @unique @db.VarChar(10)   // 6-digit church code for onboarding
+  mission       String?  @db.Text
+  vision        String?  @db.Text
+  ein           String?  @db.VarChar(20)           // tax ID for giving receipts
+  phone         String?  @db.VarChar(20)
+  email         String?  @db.VarChar(255)
+  website       String?  @db.VarChar(500)
+  address       String?  @db.Text
+  logoUrl       String?  @map("logo_url") @db.VarChar(500)
+  coverImageUrl String?  @map("cover_image_url") @db.VarChar(500)
+  socialLinks   Json     @default("{}") @map("social_links")    // {facebook, instagram, youtube, twitter}
+  settings      Json     @default("{}") @map("settings")        // feature flags, branding colors, etc.
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  users         User[]
+  sermonSeries  SermonSeries[]
+  sermons       Sermon[]
+  events        Event[]
+  devotionals   Devotional[]
+  readingPlans  ReadingPlan[]
+  campuses      Campus[]
+  coreValues    CoreValue[]
+  staffMembers  StaffMember[]
+  faqs          FAQ[]
+  // Phase 3
+  givingCategories  GivingCategory[]
+  givingCampaigns   GivingCampaign[]
+  donations         Donation[]
+  pledges           Pledge[]
+  recurringDonations RecurringDonation[]
+  // Phase 4
+  connectGroups     ConnectGroup[]
+  announcements     Announcement[]
+  testimonies       Testimony[]
+  forumCategories   ForumCategory[]
+  forumThreads      ForumThread[]
+  prayerRequests    PrayerRequest[]
+  inviteLinks       InviteLink[]
+  // Phase 5
+  liveServices      LiveService[]
+  // Phase 6
+  volunteerOpportunities VolunteerOpportunity[]
+  rosterShifts       RosterShift[]
+  children           Child[]
+  rooms              Room[]
+  photoAlbums        PhotoAlbum[]
+  photos             Photo[]
+  podcastEpisodes    PodcastEpisode[]
+  worshipSongs       WorshipSong[]
+  // Phase 7
+  attendances        Attendance[]
+  spiritualMilestones SpiritualMilestone[]
+
+  @@map("churches")
+}
+
+// ─────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────
+model User {
+  id                  String    @id @default(uuid()) @db.Uuid
+  churchId            String?   @map("church_id") @db.Uuid
+  email               String    @unique @db.VarChar(255)
+  passwordHash        String    @map("password_hash") @db.VarChar(255)
+  emailVerified       Boolean   @default(false) @map("email_verified")
+  verificationToken   String?   @map("verification_token") @db.VarChar(255)
+  verificationExpires DateTime? @map("verification_expires") @db.Timestamptz()
+  resetToken          String?   @map("reset_token") @db.VarChar(255)
+  resetTokenExpires   DateTime? @map("reset_token_expires") @db.Timestamptz()
+  refreshToken        String?   @map("refresh_token") @db.VarChar(500)
+  name                String    @db.VarChar(255)
+  phone               String?   @db.VarChar(20)
+  bio                 String?   @db.Text
+  avatarUrl           String?   @map("avatar_url") @db.VarChar(500)
+  department          String?   @db.VarChar(100)   // Media, Worship, Children, etc.
+  role                Role      @default(MEMBER)
+  joinedDate          DateTime  @default(now()) @map("joined_date") @db.Date
+  isActive            Boolean   @default(true) @map("is_active")
+  isDirectoryVisible  Boolean   @default(true) @map("is_directory_visible")
+  hasCompletedSetup   Boolean   @default(false) @map("has_completed_setup")
+  fcmTokens           String[]  @default([]) @map("fcm_tokens")
+  notificationPrefs   Json      @default("{}") @map("notification_prefs")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church Church? @relation(fields: [churchId], references: [id], onDelete: SetNull)
+
+  // Phase 2 relations
+  sermonProgress   UserSermonProgress[]
+  sermonNotes      UserSermonNote[]
+  savedSermons     SavedSermon[]
+  eventRegistrations EventRegistration[]
+  verseHighlights  UserVerseHighlight[]
+  devotionalReads  UserDevotionalRead[]
+  readingPlans     UserReadingPlan[]
+  // Phase 3 relations
+  donations        Donation[]
+  paymentMethods   UserPaymentMethod[]
+  pledges          Pledge[]
+  recurringDonations RecurringDonation[]
+  // Phase 4 relations
+  groupMemberships    GroupMembership[]
+  ledGroups           ConnectGroup[]       @relation("GroupLeader")
+  announcementsAuthored Announcement[]
+  announcementReads   AnnouncementRead[]
+  testimonies         Testimony[]          @relation("TestimonyAuthor")
+  testimonyApprovals  Testimony[]          @relation("TestimonyApprover")
+  testimonyReactions  TestimonyReaction[]
+  forumThreads        ForumThread[]
+  forumReplies        ForumReply[]
+  forumLikes          ForumLike[]
+  forumBookmarks      ForumBookmark[]
+  prayerRequests      PrayerRequest[]
+  prayerInteractions  PrayerInteraction[]
+  inviteLinks         InviteLink[]
+  // Phase 5 relations
+  conversationsCreated Conversation[]       @relation("ConversationCreator")
+  conversationMembers  ConversationMember[]
+  messagesSent         Message[]            @relation("MessageSender")
+  notifications        Notification[]
+  liveChatMessages     LiveChatMessage[]
+  // Phase 6 relations
+  volunteerSignups     VolunteerSignup[]
+  rosterShifts         RosterShift[]
+  children             Child[]
+  checkInsAsParent     CheckIn[]            @relation("CheckInParent")
+  checkInsAsOperator   CheckIn[]            @relation("CheckInOperator")
+  photos               Photo[]
+  podcastProgress      UserPodcastProgress[]
+  // Phase 7 relations
+  attendances          Attendance[]
+  spiritualMilestones  SpiritualMilestone[]
+  savedItems           SavedItem[]
+
+  @@index([churchId])
+  @@index([email])
+  @@index([verificationToken])
+  @@index([resetToken])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────────────
+enum Role {
+  MEMBER
+  LEADER
+  PASTOR
+  ADMIN
+  SUPER_ADMIN
+
+  @@map("user_role")
+}
+
+enum Testament {
+  OT
+  NT
+
+  @@map("testament")
+}
+
+enum EventRegistrationStatus {
+  REGISTERED
+  WAITLISTED
+  CANCELLED
+
+  @@map("event_registration_status")
+}
+
+enum PaymentMethod {
+  CARD
+  BANK
+  MOBILE
+  WALLET
+
+  @@map("payment_method")
+}
+
+enum PaymentProvider {
+  PAYSTACK
+  STRIPE
+  MANUAL
+
+  @@map("payment_provider")
+}
+
+enum DonationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+
+  @@map("donation_status")
+}
+
+enum PledgeStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+
+  @@map("pledge_status")
+}
+
+enum GivingFrequency {
+  ONE_TIME
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUALLY
+
+  @@map("giving_frequency")
+}
+
+enum RecurringStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+
+  @@map("recurring_status")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 2: Core Content
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// SERMON SERIES
+// ─────────────────────────────────────────────────────
+model SermonSeries {
+  id          String    @id @default(uuid()) @db.Uuid
+  churchId    String    @map("church_id") @db.Uuid
+  title       String    @db.VarChar(255)
+  description String?   @db.Text
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  startDate   DateTime? @map("start_date") @db.Date
+  endDate     DateTime? @map("end_date") @db.Date
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church  Church   @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  sermons Sermon[]
+
+  @@index([churchId])
+  @@map("sermon_series")
+}
+
+// ─────────────────────────────────────────────────────
+// SERMONS
+// ─────────────────────────────────────────────────────
+model Sermon {
+  id            String    @id @default(uuid()) @db.Uuid
+  churchId      String    @map("church_id") @db.Uuid
+  seriesId      String?   @map("series_id") @db.Uuid
+  title         String    @db.VarChar(255)
+  speaker       String    @db.VarChar(255)
+  description   String?   @db.Text
+  date          DateTime  @db.Date
+  duration      Int?      // duration in seconds
+  audioUrl      String?   @map("audio_url") @db.VarChar(500)
+  videoUrl      String?   @map("video_url") @db.VarChar(500)
+  thumbnailUrl  String?   @map("thumbnail_url") @db.VarChar(500)
+  scriptureRef  String?   @map("scripture_ref") @db.VarChar(255) // e.g., "John 3:16-18"
+  tags          String[]  @default([])
+  likeCount     Int       @default(0) @map("like_count")
+  playCount     Int       @default(0) @map("play_count")
+  isFeatured    Boolean   @default(false) @map("is_featured")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church   Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  series   SermonSeries? @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  progress UserSermonProgress[]
+  notes    UserSermonNote[]
+  saved    SavedSermon[]
+
+  @@index([churchId])
+  @@index([seriesId])
+  @@index([date])
+  @@index([isFeatured])
+  @@map("sermons")
+}
+
+model UserSermonProgress {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  sermonId     String    @map("sermon_id") @db.Uuid
+  position     Int       @default(0) // seconds
+  completed    Boolean   @default(false)
+  lastPlayedAt DateTime  @default(now()) @map("last_played_at") @db.Timestamptz()
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sermon Sermon @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sermonId])
+  @@map("user_sermon_progress")
+}
+
+model UserSermonNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  sermonId  String   @map("sermon_id") @db.Uuid
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sermon Sermon @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sermonId])
+  @@map("user_sermon_notes")
+}
+
+model SavedSermon {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  sermonId  String   @map("sermon_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sermon Sermon @relation(fields: [sermonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sermonId])
+  @@map("saved_sermons")
+}
+
+// ─────────────────────────────────────────────────────
+// EVENTS
+// ─────────────────────────────────────────────────────
+model Event {
+  id                   String    @id @default(uuid()) @db.Uuid
+  churchId             String    @map("church_id") @db.Uuid
+  title                String    @db.VarChar(255)
+  description          String?   @db.Text
+  category             String    @db.VarChar(100) // "worship", "conference", "youth", "prayer", "outreach", "fellowship"
+  imageUrl             String?   @map("image_url") @db.VarChar(500)
+  location             String?   @db.VarChar(500)
+  startDate            DateTime  @map("start_date") @db.Timestamptz()
+  endDate              DateTime? @map("end_date") @db.Timestamptz()
+  isRecurring          Boolean   @default(false) @map("is_recurring")
+  recurrenceRule       String?   @map("recurrence_rule") @db.VarChar(255) // iCal RRULE
+  registrationRequired Boolean   @default(false) @map("registration_required")
+  maxCapacity          Int?      @map("max_capacity")
+  registeredCount      Int       @default(0) @map("registered_count")
+  isFeatured           Boolean   @default(false) @map("is_featured")
+  tags                 String[]  @default([])
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church        Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  speakers      EventSpeaker[]
+  registrations EventRegistration[]
+  photoAlbums   PhotoAlbum[]
+
+  @@index([churchId])
+  @@index([startDate])
+  @@index([isFeatured])
+  @@index([category])
+  @@map("events")
+}
+
+model EventSpeaker {
+  id        String  @id @default(uuid()) @db.Uuid
+  eventId   String  @map("event_id") @db.Uuid
+  name      String  @db.VarChar(255)
+  title     String? @db.VarChar(255)
+  imageUrl  String? @map("image_url") @db.VarChar(500)
+  sortOrder Int     @default(0) @map("sort_order")
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_speakers")
+}
+
+model EventRegistration {
+  id           String                  @id @default(uuid()) @db.Uuid
+  userId       String                  @map("user_id") @db.Uuid
+  eventId      String                  @map("event_id") @db.Uuid
+  status       EventRegistrationStatus @default(REGISTERED)
+  registeredAt DateTime                @default(now()) @map("registered_at") @db.Timestamptz()
+  createdAt    DateTime                @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime                @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("event_registrations")
+}
+
+// ─────────────────────────────────────────────────────
+// BIBLE
+// ─────────────────────────────────────────────────────
+model BibleBook {
+  id           String    @id @default(uuid()) @db.Uuid
+  name         String    @db.VarChar(100) // "Genesis"
+  abbreviation String    @db.VarChar(10)  // "Gen"
+  testament    Testament
+  bookOrder    Int       @map("book_order") // 1-66
+  chapterCount Int       @map("chapter_count")
+
+  // Relations
+  verses BibleVerse[]
+
+  @@unique([bookOrder])
+  @@map("bible_books")
+}
+
+model BibleVerse {
+  id      String @id @default(uuid()) @db.Uuid
+  bookId  String @map("book_id") @db.Uuid
+  chapter Int
+  verse   Int
+  text    String @db.Text
+
+  // Relations
+  book       BibleBook          @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  highlights UserVerseHighlight[]
+
+  @@unique([bookId, chapter, verse])
+  @@index([bookId, chapter])
+  @@map("bible_verses")
+}
+
+model UserVerseHighlight {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  verseId   String   @map("verse_id") @db.Uuid
+  color     String   @db.VarChar(20) @default("yellow") // yellow, blue, green, pink, orange
+  note      String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verse BibleVerse @relation(fields: [verseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, verseId])
+  @@map("user_verse_highlights")
+}
+
+// ─────────────────────────────────────────────────────
+// DEVOTIONALS
+// ─────────────────────────────────────────────────────
+model Devotional {
+  id            String   @id @default(uuid()) @db.Uuid
+  churchId      String   @map("church_id") @db.Uuid
+  title         String   @db.VarChar(255)
+  content       String   @db.Text
+  scriptureRef  String   @map("scripture_ref") @db.VarChar(255) // "Psalm 23:1-6"
+  scriptureText String   @map("scripture_text") @db.Text
+  date          DateTime @unique @db.Date // one devotional per day
+  imageUrl      String?  @map("image_url") @db.VarChar(500)
+  authorName    String   @map("author_name") @db.VarChar(255)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  reads  UserDevotionalRead[]
+
+  @@index([churchId])
+  @@index([date])
+  @@map("devotionals")
+}
+
+model UserDevotionalRead {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  devotionalId String   @map("devotional_id") @db.Uuid
+  readAt       DateTime @default(now()) @map("read_at") @db.Timestamptz()
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  devotional Devotional @relation(fields: [devotionalId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, devotionalId])
+  @@map("user_devotional_reads")
+}
+
+// ─────────────────────────────────────────────────────
+// READING PLANS
+// ─────────────────────────────────────────────────────
+model ReadingPlan {
+  id            String   @id @default(uuid()) @db.Uuid
+  churchId      String   @map("church_id") @db.Uuid
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  imageUrl      String?  @map("image_url") @db.VarChar(500)
+  durationDays  Int      @map("duration_days")
+  category      String   @db.VarChar(100) // "faith", "prayer", "family", "new-believer"
+  enrolledCount Int      @default(0) @map("enrolled_count")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church      Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  days        ReadingPlanDay[]
+  enrollments UserReadingPlan[]
+
+  @@index([churchId])
+  @@map("reading_plans")
+}
+
+model ReadingPlanDay {
+  id           String @id @default(uuid()) @db.Uuid
+  planId       String @map("plan_id") @db.Uuid
+  dayNumber    Int    @map("day_number")
+  title        String @db.VarChar(255)
+  scriptureRef String @map("scripture_ref") @db.VarChar(255)
+  content      String @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  plan     ReadingPlan               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  progress UserReadingPlanProgress[]
+
+  @@unique([planId, dayNumber])
+  @@map("reading_plan_days")
+}
+
+model UserReadingPlan {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  planId      String    @map("plan_id") @db.Uuid
+  startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz()
+  completedAt DateTime? @map("completed_at") @db.Timestamptz()
+  currentDay  Int       @default(1) @map("current_day")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user     User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan     ReadingPlan               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  progress UserReadingPlanProgress[]
+
+  @@unique([userId, planId])
+  @@map("user_reading_plans")
+}
+
+model UserReadingPlanProgress {
+  id                String   @id @default(uuid()) @db.Uuid
+  userReadingPlanId String   @map("user_reading_plan_id") @db.Uuid
+  dayNumber         Int      @map("day_number")
+  completedAt       DateTime @default(now()) @map("completed_at") @db.Timestamptz()
+
+  // Relations
+  userReadingPlan UserReadingPlan @relation(fields: [userReadingPlanId], references: [id], onDelete: Cascade)
+  readingPlanDay  ReadingPlanDay? @relation(fields: [readingPlanDayId], references: [id], onDelete: Cascade)
+  readingPlanDayId String?       @map("reading_plan_day_id") @db.Uuid
+
+  @@unique([userReadingPlanId, dayNumber])
+  @@map("user_reading_plan_progress")
+}
+
+// ─────────────────────────────────────────────────────
+// CHURCH INFO (Campuses, Staff, FAQs, Core Values)
+// ─────────────────────────────────────────────────────
+model Campus {
+  id        String   @id @default(uuid()) @db.Uuid
+  churchId  String   @map("church_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  address   String   @db.Text
+  lat       Float?
+  lng       Float?
+  phone     String?  @db.VarChar(20)
+  email     String?  @db.VarChar(255)
+  imageUrl  String?  @map("image_url") @db.VarChar(500)
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church       Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  serviceTimes ServiceTime[]
+
+  @@index([churchId])
+  @@map("campuses")
+}
+
+model ServiceTime {
+  id        String @id @default(uuid()) @db.Uuid
+  campusId  String @map("campus_id") @db.Uuid
+  dayOfWeek String @map("day_of_week") @db.VarChar(20) // "Sunday", "Wednesday"
+  time      String @db.VarChar(10) // "09:00"
+  label     String? @db.VarChar(100) // "First Service", "Bible Study"
+
+  // Relations
+  campus Campus @relation(fields: [campusId], references: [id], onDelete: Cascade)
+
+  @@map("service_times")
+}
+
+model CoreValue {
+  id          String   @id @default(uuid()) @db.Uuid
+  churchId    String   @map("church_id") @db.Uuid
+  title       String   @db.VarChar(255)
+  description String   @db.Text
+  iconUrl     String?  @map("icon_url") @db.VarChar(500)
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("core_values")
+}
+
+model StaffMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  churchId  String   @map("church_id") @db.Uuid
+  name      String   @db.VarChar(255)
+  title     String   @db.VarChar(255) // "Senior Pastor", "Worship Director"
+  bio       String?  @db.Text
+  imageUrl  String?  @map("image_url") @db.VarChar(500)
+  email     String?  @db.VarChar(255)
+  phone     String?  @db.VarChar(20)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("staff_members")
+}
+
+model FAQ {
+  id        String   @id @default(uuid()) @db.Uuid
+  churchId  String   @map("church_id") @db.Uuid
+  question  String   @db.Text
+  answer    String   @db.Text
+  category  String?  @db.VarChar(100)
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@map("faqs")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 3: Giving & Finances
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// GIVING CATEGORIES
+// ─────────────────────────────────────────────────────
+model GivingCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  churchId    String   @map("church_id") @db.Uuid
+  name        String   @db.VarChar(100)  // "Tithe", "Offering", "Building Fund", etc.
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church    Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  donations Donation[]
+  recurring RecurringDonation[]
+
+  @@index([churchId])
+  @@map("giving_categories")
+}
+
+// ─────────────────────────────────────────────────────
+// GIVING CAMPAIGNS
+// ─────────────────────────────────────────────────────
+model GivingCampaign {
+  id            String    @id @default(uuid()) @db.Uuid
+  churchId      String    @map("church_id") @db.Uuid
+  title         String    @db.VarChar(255)
+  description   String?   @db.Text
+  imageUrl      String?   @map("image_url") @db.VarChar(500)
+  goalAmount    Float     @map("goal_amount")
+  raisedAmount  Float     @default(0) @map("raised_amount")
+  donorCount    Int       @default(0) @map("donor_count")
+  startDate     DateTime  @map("start_date") @db.Date
+  endDate       DateTime? @map("end_date") @db.Date
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church    Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  donations Donation[]
+  pledges   Pledge[]
+
+  @@index([churchId])
+  @@index([isActive])
+  @@map("giving_campaigns")
+}
+
+// ─────────────────────────────────────────────────────
+// DONATIONS (one-time & campaign)
+// ─────────────────────────────────────────────────────
+model Donation {
+  id               String         @id @default(uuid()) @db.Uuid
+  userId           String         @map("user_id") @db.Uuid
+  churchId         String         @map("church_id") @db.Uuid
+  categoryId       String?        @map("category_id") @db.Uuid
+  campaignId       String?        @map("campaign_id") @db.Uuid
+  amount           Float
+  currency         String         @default("NGN") @db.VarChar(10)
+  paymentMethod    PaymentMethod  @map("payment_method")
+  paymentProvider  PaymentProvider @map("payment_provider")
+  transactionRef   String         @unique @map("transaction_ref") @db.VarChar(255)
+  providerRef      String?        @map("provider_ref") @db.VarChar(255) // Paystack/Stripe transaction ID
+  status           DonationStatus @default(PENDING)
+  receiptNumber    String?        @unique @map("receipt_number") @db.VarChar(50)
+  receiptUrl       String?        @map("receipt_url") @db.VarChar(500) // PDF receipt URL
+  metadata         Json           @default("{}")
+  isAnonymous      Boolean        @default(false) @map("is_anonymous")
+  note             String?        @db.Text // optional donor note
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church   Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  category GivingCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  campaign GivingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([churchId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("donations")
+}
+
+// ─────────────────────────────────────────────────────
+// SAVED PAYMENT METHODS
+// ─────────────────────────────────────────────────────
+model UserPaymentMethod {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  type          PaymentMethod  // CARD, BANK
+  provider      PaymentProvider // PAYSTACK, STRIPE
+  last4         String         @db.VarChar(4)
+  brand         String?        @db.VarChar(20) // "Visa", "Mastercard"
+  expiryMonth   Int?           @map("expiry_month")
+  expiryYear    Int?           @map("expiry_year")
+  bankName      String?        @map("bank_name") @db.VarChar(100)
+  isDefault     Boolean        @default(false) @map("is_default")
+  providerToken String         @map("provider_token") @db.VarChar(500) // Paystack auth code / Stripe PM ID
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recurring RecurringDonation[]
+
+  @@index([userId])
+  @@map("user_payment_methods")
+}
+
+// ─────────────────────────────────────────────────────
+// PLEDGES
+// ─────────────────────────────────────────────────────
+model Pledge {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @map("user_id") @db.Uuid
+  churchId        String         @map("church_id") @db.Uuid
+  campaignId      String?        @map("campaign_id") @db.Uuid
+  title           String         @db.VarChar(255)
+  totalAmount     Float          @map("total_amount")
+  paidAmount      Float          @default(0) @map("paid_amount")
+  frequency       GivingFrequency
+  startDate       DateTime       @map("start_date") @db.Date
+  endDate         DateTime?      @map("end_date") @db.Date
+  nextDueDate     DateTime?      @map("next_due_date") @db.Date
+  status          PledgeStatus   @default(ACTIVE)
+  paymentsCompleted Int          @default(0) @map("payments_completed")
+  totalPayments   Int?           @map("total_payments") // null = unlimited
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church   Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  campaign GivingCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  payments PledgePayment[]
+
+  @@index([userId])
+  @@index([churchId])
+  @@index([status])
+  @@map("pledges")
+}
+
+// ─────────────────────────────────────────────────────
+// PLEDGE PAYMENTS (tracking each payment against a pledge)
+// ─────────────────────────────────────────────────────
+model PledgePayment {
+  id        String   @id @default(uuid()) @db.Uuid
+  pledgeId  String   @map("pledge_id") @db.Uuid
+  amount    Float
+  paidAt    DateTime @default(now()) @map("paid_at") @db.Timestamptz()
+  status    DonationStatus @default(SUCCESS)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  pledge Pledge @relation(fields: [pledgeId], references: [id], onDelete: Cascade)
+
+  @@index([pledgeId])
+  @@map("pledge_payments")
+}
+
+// ─────────────────────────────────────────────────────
+// RECURRING DONATIONS
+// ─────────────────────────────────────────────────────
+model RecurringDonation {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  churchId         String          @map("church_id") @db.Uuid
+  categoryId       String          @map("category_id") @db.Uuid
+  paymentMethodId  String          @map("payment_method_id") @db.Uuid
+  amount           Float
+  currency         String          @default("NGN") @db.VarChar(10)
+  frequency        GivingFrequency
+  nextChargeDate   DateTime        @map("next_charge_date") @db.Date
+  status           RecurringStatus @default(ACTIVE)
+  failureCount     Int             @default(0) @map("failure_count")
+  lastChargedAt    DateTime?       @map("last_charged_at") @db.Timestamptz()
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church        Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  category      GivingCategory    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  paymentMethod UserPaymentMethod @relation(fields: [paymentMethodId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([churchId])
+  @@index([status, nextChargeDate])
+  @@map("recurring_donations")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 4: Community & Engagement
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// ENUMS (Phase 4)
+// ─────────────────────────────────────────────────────
+enum GroupCategory {
+  BIBLE_STUDY
+  YOUTH
+  WOMEN
+  MEN
+  COUPLES
+  PRAYER
+  SERVICE
+  OTHER
+
+  @@map("group_category")
+}
+
+enum GroupRole {
+  MEMBER
+  LEADER
+
+  @@map("group_role")
+}
+
+enum TestimonyStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("testimony_status")
+}
+
+enum ReactionType {
+  LIKE
+  PRAY
+
+  @@map("reaction_type")
+}
+
+enum PrayerRequestStatus {
+  ACTIVE
+  ANSWERED
+  CLOSED
+
+  @@map("prayer_request_status")
+}
+
+// ─────────────────────────────────────────────────────
+// CONNECT GROUPS
+// ─────────────────────────────────────────────────────
+model ConnectGroup {
+  id          String        @id @default(uuid()) @db.Uuid
+  churchId    String        @map("church_id") @db.Uuid
+  name        String        @db.VarChar(255)
+  description String?       @db.Text
+  imageUrl    String?       @map("image_url") @db.VarChar(500)
+  category    GroupCategory
+  meetingDay  String?       @map("meeting_day") @db.VarChar(20)  // Monday, Tuesday, etc.
+  meetingTime String?       @map("meeting_time") @db.VarChar(20) // 6:00 PM
+  location    String?       @db.VarChar(500)
+  leaderId    String?       @map("leader_id") @db.Uuid
+  maxMembers  Int?          @map("max_members")
+  memberCount Int           @default(0) @map("member_count")
+  isActive    Boolean       @default(true) @map("is_active")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church      Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  leader      User?           @relation("GroupLeader", fields: [leaderId], references: [id], onDelete: SetNull)
+  memberships GroupMembership[]
+
+  @@index([churchId])
+  @@index([category])
+  @@index([leaderId])
+  @@map("connect_groups")
+}
+
+model GroupMembership {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  groupId   String    @map("group_id") @db.Uuid
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime  @default(now()) @map("joined_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user  User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group ConnectGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, groupId])
+  @@index([groupId])
+  @@map("group_memberships")
+}
+
+// ─────────────────────────────────────────────────────
+// ANNOUNCEMENTS
+// ─────────────────────────────────────────────────────
+model Announcement {
+  id          String    @id @default(uuid()) @db.Uuid
+  churchId    String    @map("church_id") @db.Uuid
+  authorId    String    @map("author_id") @db.Uuid
+  title       String    @db.VarChar(255)
+  content     String    @db.Text
+  imageUrl    String?   @map("image_url") @db.VarChar(500)
+  category    String?   @db.VarChar(100)
+  isUrgent    Boolean   @default(false) @map("is_urgent")
+  isPinned    Boolean   @default(false) @map("is_pinned")
+  publishedAt DateTime  @default(now()) @map("published_at") @db.Timestamptz()
+  expiresAt   DateTime? @map("expires_at") @db.Timestamptz()
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  author User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  reads  AnnouncementRead[]
+
+  @@index([churchId, publishedAt])
+  @@index([isUrgent])
+  @@map("announcements")
+}
+
+model AnnouncementRead {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  announcementId String   @map("announcement_id") @db.Uuid
+  readAt         DateTime @default(now()) @map("read_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
+  @@map("announcement_reads")
+}
+
+// ─────────────────────────────────────────────────────
+// TESTIMONIES
+// ─────────────────────────────────────────────────────
+model Testimony {
+  id           String          @id @default(uuid()) @db.Uuid
+  userId       String          @map("user_id") @db.Uuid
+  churchId     String          @map("church_id") @db.Uuid
+  title        String          @db.VarChar(255)
+  content      String          @db.Text
+  isAnonymous  Boolean         @default(false) @map("is_anonymous")
+  status       TestimonyStatus @default(PENDING)
+  approvedAt   DateTime?       @map("approved_at") @db.Timestamptz()
+  approvedById String?         @map("approved_by_id") @db.Uuid
+  likeCount    Int             @default(0) @map("like_count")
+  prayerCount  Int             @default(0) @map("prayer_count")
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user       User                @relation("TestimonyAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  church     Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  approvedBy User?               @relation("TestimonyApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  reactions  TestimonyReaction[]
+
+  @@index([churchId, status])
+  @@index([userId])
+  @@map("testimonies")
+}
+
+model TestimonyReaction {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  testimonyId String       @map("testimony_id") @db.Uuid
+  type        ReactionType
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  testimony Testimony @relation(fields: [testimonyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, testimonyId])
+  @@map("testimony_reactions")
+}
+
+// ─────────────────────────────────────────────────────
+// FORUM
+// ─────────────────────────────────────────────────────
+model ForumCategory {
+  id          String   @id @default(uuid()) @db.Uuid
+  churchId    String   @map("church_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  iconUrl     String?  @map("icon_url") @db.VarChar(500)
+  threadCount Int      @default(0) @map("thread_count")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church  Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  threads ForumThread[]
+
+  @@index([churchId])
+  @@map("forum_categories")
+}
+
+model ForumThread {
+  id             String   @id @default(uuid()) @db.Uuid
+  categoryId     String   @map("category_id") @db.Uuid
+  churchId       String   @map("church_id") @db.Uuid
+  authorId       String   @map("author_id") @db.Uuid
+  title          String   @db.VarChar(500)
+  content        String   @db.Text
+  isPinned       Boolean  @default(false) @map("is_pinned")
+  isLocked       Boolean  @default(false) @map("is_locked")
+  viewCount      Int      @default(0) @map("view_count")
+  likeCount      Int      @default(0) @map("like_count")
+  replyCount     Int      @default(0) @map("reply_count")
+  lastActivityAt DateTime @default(now()) @map("last_activity_at") @db.Timestamptz()
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  category  ForumCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  church    Church          @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  author    User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  replies   ForumReply[]
+  likes     ForumLike[]
+  bookmarks ForumBookmark[]
+
+  @@index([categoryId, lastActivityAt])
+  @@index([churchId])
+  @@index([authorId])
+  @@index([likeCount])
+  @@map("forum_threads")
+}
+
+model ForumReply {
+  id        String   @id @default(uuid()) @db.Uuid
+  threadId  String   @map("thread_id") @db.Uuid
+  authorId  String   @map("author_id") @db.Uuid
+  content   String   @db.Text
+  likeCount Int      @default(0) @map("like_count")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  thread ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  likes  ForumLike[]
+
+  @@index([threadId])
+  @@index([authorId])
+  @@map("forum_replies")
+}
+
+model ForumLike {
+  id       String   @id @default(uuid()) @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  threadId String?  @map("thread_id") @db.Uuid
+  replyId  String?  @map("reply_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread ForumThread? @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  reply  ForumReply?  @relation(fields: [replyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@unique([userId, replyId])
+  @@map("forum_likes")
+}
+
+model ForumBookmark {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  threadId  String   @map("thread_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  thread ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, threadId])
+  @@map("forum_bookmarks")
+}
+
+// ─────────────────────────────────────────────────────
+// PRAYER REQUESTS
+// ─────────────────────────────────────────────────────
+model PrayerRequest {
+  id           String              @id @default(uuid()) @db.Uuid
+  userId       String              @map("user_id") @db.Uuid
+  churchId     String              @map("church_id") @db.Uuid
+  title        String              @db.VarChar(255)
+  content      String              @db.Text
+  isAnonymous  Boolean             @default(false) @map("is_anonymous")
+  isUrgent     Boolean             @default(false) @map("is_urgent")
+  status       PrayerRequestStatus @default(ACTIVE)
+  prayerCount  Int                 @default(0) @map("prayer_count")
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime            @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church       Church              @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  interactions PrayerInteraction[]
+
+  @@index([churchId, status])
+  @@index([userId])
+  @@map("prayer_requests")
+}
+
+model PrayerInteraction {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  prayerRequestId String   @map("prayer_request_id") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  prayerRequest PrayerRequest @relation(fields: [prayerRequestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, prayerRequestId])
+  @@map("prayer_interactions")
+}
+
+// ─────────────────────────────────────────────────────
+// INVITE LINKS
+// ─────────────────────────────────────────────────────
+model InviteLink {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  churchId  String    @map("church_id") @db.Uuid
+  code      String    @unique @db.VarChar(20)
+  usedCount Int       @default(0) @map("used_count")
+  maxUses   Int?      @map("max_uses")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz()
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([churchId])
+  @@index([code])
+  @@map("invite_links")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 5: Real-Time & Notifications
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// ENUMS (Phase 5)
+// ─────────────────────────────────────────────────────
+enum ConversationType {
+  DIRECT
+  GROUP
+
+  @@map("conversation_type")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  SYSTEM
+
+  @@map("message_type")
+}
+
+enum ConversationRole {
+  MEMBER
+  ADMIN
+
+  @@map("conversation_role")
+}
+
+enum NotificationType {
+  SERMON
+  EVENT
+  CHAT
+  GIVING
+  PRAYER
+  ANNOUNCEMENT
+  GROUP
+  FORUM
+  VOLUNTEER
+  KIDS
+  DEVOTIONAL
+  PERSONAL
+  SECURITY
+  SYSTEM
+
+  @@map("notification_type")
+}
+
+enum LiveServiceStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+
+  @@map("live_service_status")
+}
+
+enum LiveChatType {
+  MESSAGE
+  PRAYER
+  REACTION
+
+  @@map("live_chat_type")
+}
+
+// ─────────────────────────────────────────────────────
+// CONVERSATIONS (Chat)
+// ─────────────────────────────────────────────────────
+model Conversation {
+  id            String           @id @default(uuid()) @db.Uuid
+  churchId      String           @map("church_id") @db.Uuid
+  type          ConversationType
+  name          String?          @db.VarChar(255)
+  imageUrl      String?          @map("image_url") @db.VarChar(500)
+  createdById   String           @map("created_by_id") @db.Uuid
+  lastMessageAt DateTime?        @map("last_message_at") @db.Timestamptz()
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  createdBy User                 @relation("ConversationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  members   ConversationMember[]
+  messages  Message[]
+
+  @@index([churchId])
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationMember {
+  id             String           @id @default(uuid()) @db.Uuid
+  conversationId String           @map("conversation_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  role           ConversationRole @default(MEMBER)
+  isPinned       Boolean          @default(false) @map("is_pinned")
+  isMuted        Boolean          @default(false) @map("is_muted")
+  lastReadAt     DateTime?        @map("last_read_at") @db.Timestamptz()
+  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz()
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_members")
+}
+
+model Message {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  senderId       String      @map("sender_id") @db.Uuid
+  content        String      @db.Text
+  type           MessageType @default(TEXT)
+  mediaUrl       String?     @map("media_url") @db.VarChar(500)
+  replyToId      String?     @map("reply_to_id") @db.Uuid
+  isEdited       Boolean     @default(false) @map("is_edited")
+  isDeleted      Boolean     @default(false) @map("is_deleted")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo      Message?     @relation("MessageReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]    @relation("MessageReply")
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@map("messages")
+}
+
+// ─────────────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────────────
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(255)
+  body      String           @db.Text
+  data      Json             @default("{}") // {entityId, entityType, deepLink}
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at") @db.Timestamptz()
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+// ─────────────────────────────────────────────────────
+// LIVE SERVICE
+// ─────────────────────────────────────────────────────
+model LiveService {
+  id           String            @id @default(uuid()) @db.Uuid
+  churchId     String            @map("church_id") @db.Uuid
+  title        String            @db.VarChar(255)
+  description  String?           @db.Text
+  streamUrl    String?           @map("stream_url") @db.VarChar(500)
+  status       LiveServiceStatus @default(SCHEDULED)
+  scheduledAt  DateTime          @map("scheduled_at") @db.Timestamptz()
+  startedAt    DateTime?         @map("started_at") @db.Timestamptz()
+  endedAt      DateTime?         @map("ended_at") @db.Timestamptz()
+  viewerCount  Int               @default(0) @map("viewer_count")
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime          @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church       Church            @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  chatMessages LiveChatMessage[]
+
+  @@index([churchId, status])
+  @@index([scheduledAt])
+  @@map("live_services")
+}
+
+model LiveChatMessage {
+  id            String       @id @default(uuid()) @db.Uuid
+  liveServiceId String       @map("live_service_id") @db.Uuid
+  userId        String       @map("user_id") @db.Uuid
+  content       String       @db.Text
+  type          LiveChatType @default(MESSAGE)
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz()
+
+  // Relations
+  liveService LiveService @relation(fields: [liveServiceId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([liveServiceId, createdAt])
+  @@index([userId])
+  @@map("live_chat_messages")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 6: Volunteering, Media & Search
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// ENUMS (Phase 6)
+// ─────────────────────────────────────────────────────
+enum VolunteerSignupStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("volunteer_signup_status")
+}
+
+enum ShiftStatus {
+  SCHEDULED
+  CHECKED_IN
+  COMPLETED
+  SWAPPED
+
+  @@map("shift_status")
+}
+
+enum CheckInStatus {
+  CHECKED_IN
+  CHECKED_OUT
+
+  @@map("checkin_status")
+}
+
+enum SongSectionType {
+  VERSE
+  CHORUS
+  BRIDGE
+  PRE_CHORUS
+  OUTRO
+  INTRO
+
+  @@map("song_section_type")
+}
+
+// ─────────────────────────────────────────────────────
+// VOLUNTEERING
+// ─────────────────────────────────────────────────────
+model VolunteerOpportunity {
+  id           String   @id @default(uuid()) @db.Uuid
+  churchId     String   @map("church_id") @db.Uuid
+  title        String   @db.VarChar(255)
+  description  String?  @db.Text
+  department   String   @db.VarChar(100)        // Media, Worship, Ushering, Children, Technical
+  requirements String?  @db.Text
+  imageUrl     String?  @map("image_url") @db.VarChar(500)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church  Church             @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  signups VolunteerSignup[]
+  shifts  RosterShift[]
+
+  @@index([churchId])
+  @@index([department])
+  @@map("volunteer_opportunities")
+}
+
+model VolunteerSignup {
+  id            String                @id @default(uuid()) @db.Uuid
+  userId        String                @map("user_id") @db.Uuid
+  opportunityId String                @map("opportunity_id") @db.Uuid
+  status        VolunteerSignupStatus @default(PENDING)
+  appliedAt     DateTime              @default(now()) @map("applied_at") @db.Timestamptz()
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime              @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunity VolunteerOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, opportunityId])
+  @@index([opportunityId])
+  @@map("volunteer_signups")
+}
+
+model RosterShift {
+  id            String      @id @default(uuid()) @db.Uuid
+  churchId      String      @map("church_id") @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  opportunityId String      @map("opportunity_id") @db.Uuid
+  date          DateTime    @db.Date
+  startTime     String      @map("start_time") @db.VarChar(10) // "09:00"
+  endTime       String      @map("end_time") @db.VarChar(10)   // "12:00"
+  status        ShiftStatus @default(SCHEDULED)
+  checkinAt     DateTime?   @map("checkin_at") @db.Timestamptz()
+  createdAt     DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime    @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church      Church               @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  opportunity VolunteerOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@index([churchId, date])
+  @@index([opportunityId])
+  @@map("roster_shifts")
+}
+
+// ─────────────────────────────────────────────────────
+// KIDS CHECK-IN
+// ─────────────────────────────────────────────────────
+model Child {
+  id           String    @id @default(uuid()) @db.Uuid
+  parentId     String    @map("parent_id") @db.Uuid
+  churchId     String    @map("church_id") @db.Uuid
+  firstName    String    @map("first_name") @db.VarChar(100)
+  lastName     String    @map("last_name") @db.VarChar(100)
+  dateOfBirth  DateTime  @map("date_of_birth") @db.Date
+  allergies    String?   @db.Text
+  medicalNotes String?   @map("medical_notes") @db.Text
+  photoUrl     String?   @map("photo_url") @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  parent   User      @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  church   Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  checkIns CheckIn[]
+
+  @@index([parentId])
+  @@index([churchId])
+  @@map("children")
+}
+
+model Room {
+  id           String   @id @default(uuid()) @db.Uuid
+  churchId     String   @map("church_id") @db.Uuid
+  name         String   @db.VarChar(255)
+  ageGroup     String   @map("age_group") @db.VarChar(100) // "0-2", "3-5", "6-8", "9-12"
+  capacity     Int
+  currentCount Int      @default(0) @map("current_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church   Church    @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  checkIns CheckIn[]
+
+  @@index([churchId])
+  @@map("rooms")
+}
+
+model CheckIn {
+  id           String        @id @default(uuid()) @db.Uuid
+  childId      String        @map("child_id") @db.Uuid
+  roomId       String        @map("room_id") @db.Uuid
+  parentId     String        @map("parent_id") @db.Uuid
+  checkedInBy  String        @map("checked_in_by") @db.Uuid
+  securityCode String        @map("security_code") @db.VarChar(10) // 6-digit code
+  status       CheckInStatus @default(CHECKED_IN)
+  checkedInAt  DateTime      @default(now()) @map("checked_in_at") @db.Timestamptz()
+  checkedOutAt DateTime?     @map("checked_out_at") @db.Timestamptz()
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  child       Child @relation(fields: [childId], references: [id], onDelete: Cascade)
+  room        Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  parent      User  @relation("CheckInParent", fields: [parentId], references: [id], onDelete: Cascade)
+  checkedInByUser User @relation("CheckInOperator", fields: [checkedInBy], references: [id], onDelete: Cascade)
+
+  @@index([childId])
+  @@index([roomId])
+  @@index([parentId])
+  @@index([securityCode])
+  @@map("check_ins")
+}
+
+// ─────────────────────────────────────────────────────
+// MEDIA (Photos, Podcasts, Worship Songs)
+// ─────────────────────────────────────────────────────
+model PhotoAlbum {
+  id            String   @id @default(uuid()) @db.Uuid
+  churchId      String   @map("church_id") @db.Uuid
+  title         String   @db.VarChar(255)
+  description   String?  @db.Text
+  coverImageUrl String?  @map("cover_image_url") @db.VarChar(500)
+  photoCount    Int      @default(0) @map("photo_count")
+  eventId       String?  @map("event_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church Church  @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  event  Event?  @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  photos Photo[]
+
+  @@index([churchId])
+  @@index([eventId])
+  @@map("photo_albums")
+}
+
+model Photo {
+  id           String   @id @default(uuid()) @db.Uuid
+  albumId      String   @map("album_id") @db.Uuid
+  churchId     String   @map("church_id") @db.Uuid
+  uploadedById String   @map("uploaded_by_id") @db.Uuid
+  imageUrl     String   @map("image_url") @db.VarChar(500)
+  thumbnailUrl String?  @map("thumbnail_url") @db.VarChar(500)
+  caption      String?  @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  album      PhotoAlbum @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  church     Church     @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  uploadedBy User       @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([albumId])
+  @@index([churchId])
+  @@map("photos")
+}
+
+model PodcastEpisode {
+  id           String   @id @default(uuid()) @db.Uuid
+  churchId     String   @map("church_id") @db.Uuid
+  title        String   @db.VarChar(255)
+  description  String?  @db.Text
+  audioUrl     String   @map("audio_url") @db.VarChar(500)
+  duration     Int                                        // in seconds
+  thumbnailUrl String?  @map("thumbnail_url") @db.VarChar(500)
+  publishedAt  DateTime @map("published_at") @db.Timestamptz()
+  playCount    Int      @default(0) @map("play_count")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church   Church                @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  progress UserPodcastProgress[]
+
+  @@index([churchId])
+  @@index([publishedAt])
+  @@map("podcast_episodes")
+}
+
+model UserPodcastProgress {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  episodeId String   @map("episode_id") @db.Uuid
+  position  Int      @default(0) // seconds
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  episode PodcastEpisode @relation(fields: [episodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, episodeId])
+  @@map("user_podcast_progress")
+}
+
+model WorshipSong {
+  id        String   @id @default(uuid()) @db.Uuid
+  churchId  String   @map("church_id") @db.Uuid
+  title     String   @db.VarChar(255)
+  artist    String   @db.VarChar(255)
+  key       String?  @db.VarChar(10)  // "C", "G", "Am"
+  tempo     Int?                       // BPM
+  tags      String[] @default([])
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  church   Church        @relation(fields: [churchId], references: [id], onDelete: Cascade)
+  sections SongSection[]
+
+  @@index([churchId])
+  @@map("worship_songs")
+}
+
+model SongSection {
+  id        String          @id @default(uuid()) @db.Uuid
+  songId    String          @map("song_id") @db.Uuid
+  type      SongSectionType
+  sortOrder Int             @default(0) @map("sort_order")
+  createdAt DateTime        @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime        @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  song  WorshipSong @relation(fields: [songId], references: [id], onDelete: Cascade)
+  lines LyricLine[]
+
+  @@index([songId])
+  @@map("song_sections")
+}
+
+model LyricLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  sectionId  String   @map("section_id") @db.Uuid
+  lineNumber Int      @map("line_number")
+  lyrics     String   @db.Text
+  chords     String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  section SongSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([sectionId])
+  @@map("lyric_lines")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Phase 7: Polish, Jobs & Testing
+// ═══════════════════════════════════════════════════════════════
+
+// ─────────────────────────────────────────────────────
+// ATTENDANCE TRACKING
+// ─────────────────────────────────────────────────────
+model Attendance {
+  id            String         @id @default(uuid()) @db.Uuid
+  userId        String         @map("user_id") @db.Uuid
+  churchId      String         @map("church_id") @db.Uuid
+  serviceDate   DateTime       @map("service_date") @db.Date
+  serviceType   ServiceType    @default(SUNDAY) @map("service_type")
+  checkinMethod CheckinMethod  @default(MANUAL) @map("checkin_method")
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt     DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, serviceDate, serviceType])
+  @@index([churchId])
+  @@index([userId])
+  @@index([serviceDate])
+  @@map("attendances")
+}
+
+// ─────────────────────────────────────────────────────
+// SPIRITUAL MILESTONES
+// ─────────────────────────────────────────────────────
+model SpiritualMilestone {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  churchId    String        @map("church_id") @db.Uuid
+  type        MilestoneType
+  title       String        @db.VarChar(255)
+  description String?       @db.Text
+  achievedAt  DateTime      @default(now()) @map("achieved_at") @db.Timestamptz()
+  iconUrl     String?       @map("icon_url") @db.VarChar(500)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  church Church @relation(fields: [churchId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([churchId])
+  @@map("spiritual_milestones")
+}
+
+// ─────────────────────────────────────────────────────
+// SAVED ITEMS (polymorphic bookmarks)
+// ─────────────────────────────────────────────────────
+model SavedItem {
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  entityType SavedEntityType @map("entity_type")
+  entityId   String         @map("entity_id") @db.Uuid
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime       @updatedAt @map("updated_at") @db.Timestamptz()
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, entityType, entityId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("saved_items")
+}
+
+// ─────────────────────────────────────────────────────
+// Phase 7 Enums
+// ─────────────────────────────────────────────────────
+enum ServiceType {
+  SUNDAY
+  MIDWEEK
+  SPECIAL
+  YOUTH
+  PRAYER
+
+  @@map("service_type")
+}
+
+enum CheckinMethod {
+  MANUAL
+  QR
+  GEOFENCE
+
+  @@map("checkin_method")
+}
+
+enum MilestoneType {
+  SALVATION
+  BAPTISM
+  FIRST_SERVE
+  SMALL_GROUP
+  MINISTRY_LEADER
+  FIRST_GIVE
+  ONE_YEAR
+  INVITE_FRIEND
+
+  @@map("milestone_type")
+}
+
+enum SavedEntityType {
+  SERMON
+  EVENT
+  DEVOTIONAL
+  VERSE
+  THREAD
+  SONG
+
+  @@map("saved_entity_type")
+}
