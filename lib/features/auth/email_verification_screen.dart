@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -18,21 +20,21 @@ import '../../shared/widgets/widgets.dart';
 //   • "Resend Email" ghost button with cooldown timer
 //   • "Change Email" ghost link to go back
 //
-// Once verified (simulated) → navigates to /auth/church-code.
+// Once verified → navigates to /auth/login so user can sign in.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class EmailVerificationScreen extends StatefulWidget {
+class EmailVerificationScreen extends ConsumerStatefulWidget {
   const EmailVerificationScreen({super.key, this.email});
 
   /// The email address the verification was sent to (displayed on screen).
   final String? email;
 
   @override
-  State<EmailVerificationScreen> createState() =>
+  ConsumerState<EmailVerificationScreen> createState() =>
       _EmailVerificationScreenState();
 }
 
-class _EmailVerificationScreenState extends State<EmailVerificationScreen>
+class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScreen>
     with SingleTickerProviderStateMixin {
   bool _isResending = false;
   bool _isVerified = false;
@@ -63,46 +65,49 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen>
     super.dispose();
   }
 
-  /// Simulate resending the verification email.
+  /// Resend the verification email via the API.
   Future<void> _resendEmail() async {
-    if (_resendCooldown > 0) return;
+    if (_resendCooldown > 0 || widget.email == null) return;
 
     setState(() => _isResending = true);
 
-    // TODO: Replace with real resend-verification API call.
-    await Future.delayed(const Duration(seconds: 1));
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .resendVerification(widget.email!);
+
     if (!mounted) return;
 
     setState(() {
       _isResending = false;
-      _resendCooldown = 30;
+      if (success) {
+        _resendCooldown = 30;
+      }
     });
 
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _resendCooldown--;
-        if (_resendCooldown <= 0) timer.cancel();
+    if (success) {
+      _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        setState(() {
+          _resendCooldown--;
+          if (_resendCooldown <= 0) timer.cancel();
+        });
       });
-    });
+    }
   }
 
-  /// Simulate checking verification status.
+  /// Navigate to login so the user can sign in after verifying.
   Future<void> _checkVerification() async {
-    // TODO: Replace with real verification check.
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
+    // Show a brief success animation, then send to login.
     setState(() => _isVerified = true);
     _checkController.forward();
 
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
 
-    context.go(AppRoutes.churchCode);
+    context.go(AppRoutes.login);
   }
 
   @override

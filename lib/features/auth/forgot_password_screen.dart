@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -12,14 +14,15 @@ import '../../shared/widgets/widgets.dart';
 //   Phase 2 — Confirmation: success icon, message, back-to-login button.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() =>
+      _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
 
   bool _isLoading = false;
@@ -38,14 +41,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _errorMessage = null;
     });
 
-    // TODO: Replace with real password-reset logic.
-    await Future.delayed(const Duration(seconds: 2));
+    final success =
+        await ref.read(authNotifierProvider.notifier).forgotPassword(email);
+
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-      _isEmailSent = true;
-    });
+    if (success) {
+      setState(() {
+        _isLoading = false;
+        _isEmailSent = true;
+      });
+    } else {
+      final authState = ref.read(authNotifierProvider);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = authState.error ?? 'Failed to send reset link.';
+      });
+    }
   }
 
   @override

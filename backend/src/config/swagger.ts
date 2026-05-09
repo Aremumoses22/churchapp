@@ -1228,8 +1228,7 @@ const options: swaggerJsdoc.Options = {
           summary: 'List connect groups',
           security: [{ BearerAuth: [] }],
           parameters: [{ $ref: '#/components/parameters/PageParam' }, { $ref: '#/components/parameters/LimitParam' }, { name: 'category', in: 'query', schema: { type: 'string' } }],
-          res 
-          ponses: { 200: { description: 'Paginated groups' } },
+          responses: { 200: { description: 'Paginated groups' } },
         },
       },
       '/groups/{id}': {

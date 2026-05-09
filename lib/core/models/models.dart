@@ -2,6 +2,8 @@
 // MODELS — Barrel File
 // ──────────────────────────────────────────────────────────────────────────────
 
+export 'api_response.dart';
+export 'auth.dart';
 export 'bible.dart';
 export 'chat.dart';
 export 'community.dart';

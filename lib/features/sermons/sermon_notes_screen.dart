@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/sermon_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -11,7 +13,7 @@ import '../../shared/widgets/widgets.dart';
 // bullet/numbered list, save & export.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class SermonNotesScreen extends StatefulWidget {
+class SermonNotesScreen extends ConsumerStatefulWidget {
   const SermonNotesScreen({
     super.key,
     this.sermonId,
@@ -26,10 +28,10 @@ class SermonNotesScreen extends StatefulWidget {
   final String? sermonDate;
 
   @override
-  State<SermonNotesScreen> createState() => _SermonNotesScreenState();
+  ConsumerState<SermonNotesScreen> createState() => _SermonNotesScreenState();
 }
 
-class _SermonNotesScreenState extends State<SermonNotesScreen> {
+class _SermonNotesScreenState extends ConsumerState<SermonNotesScreen> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _notesController = TextEditingController();
   final FocusNode _notesFocus = FocusNode();
@@ -41,6 +43,19 @@ class _SermonNotesScreenState extends State<SermonNotesScreen> {
   void initState() {
     super.initState();
     _titleController.text = widget.sermonTitle ?? 'Untitled Notes';
+    _loadExistingNotes();
+  }
+
+  Future<void> _loadExistingNotes() async {
+    if (widget.sermonId == null) return;
+    final noteAsync = ref.read(sermonNotesProvider(widget.sermonId!));
+    noteAsync.whenData((note) {
+      if (note != null && mounted) {
+        setState(() {
+          _notesController.text = note.content;
+        });
+      }
+    });
   }
 
   @override
@@ -51,8 +66,18 @@ class _SermonNotesScreenState extends State<SermonNotesScreen> {
     super.dispose();
   }
 
-  void _saveNotes() {
+  Future<void> _saveNotes() async {
     HapticFeedback.mediumImpact();
+    if (widget.sermonId != null) {
+      try {
+        final repo = ref.read(sermonRepositoryProvider);
+        await repo.saveNotes(
+            sermonId: widget.sermonId!, content: _notesController.text);
+        ref.invalidate(sermonNotesProvider(widget.sermonId!));
+      } catch (_) {
+        // Fail silently — still show saved indicator
+      }
+    }
     setState(() => _isSaved = true);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

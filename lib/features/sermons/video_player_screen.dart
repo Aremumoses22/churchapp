@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/sermon.dart';
+import '../../core/providers/sermon_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -11,7 +14,7 @@ import '../../shared/widgets/widgets.dart';
 // picture-in-picture support, Chromecast button.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlayerScreen extends ConsumerStatefulWidget {
   const VideoPlayerScreen({
     super.key,
     this.sermonId,
@@ -24,21 +27,25 @@ class VideoPlayerScreen extends StatefulWidget {
   final String? sermonSpeaker;
 
   @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+  ConsumerState<VideoPlayerScreen> createState() =>
+      _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen>
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     with SingleTickerProviderStateMixin {
   bool _isPlaying = false;
   bool _controlsVisible = true;
   bool _isFullscreen = false;
-  double _progress = 0.25;
+  double _progress = 0.0;
   String _selectedQuality = '1080p';
   late AnimationController _controlsFadeController;
   late Animation<double> _controlsFade;
 
-  final _currentPosition = const Duration(minutes: 10, seconds: 32);
-  final _totalDuration = const Duration(minutes: 42, seconds: 15);
+  // Resolved from API
+  String _title = '';
+  String _speaker = '';
+  int _totalSeconds = 0;
+  String _dateViews = '';
 
   static const _qualities = ['Auto', '1080p', '720p', '480p', '360p'];
 
@@ -54,6 +61,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       parent: _controlsFadeController,
       curve: Curves.easeOut,
     );
+    _title = widget.sermonTitle ?? '';
+    _speaker = widget.sermonSpeaker ?? '';
+    _loadSermonDetails();
+  }
+
+  Future<void> _loadSermonDetails() async {
+    if (widget.sermonId == null) return;
+    try {
+      final repo = ref.read(sermonRepositoryProvider);
+      final res = await repo.getSermon(widget.sermonId!);
+      if (res.success && res.data != null && mounted) {
+        final s = res.data!;
+        setState(() {
+          _title = s.title;
+          _speaker = s.speaker ?? _speaker;
+          _totalSeconds = s.duration ?? 0;
+          _dateViews =
+              '${s.dateFormatted} · ${s.playCount ?? 0} plays';
+        });
+        // Load related sermons (featured list excluding current)
+        try {
+          final featRes = await repo.getFeatured();
+          if (featRes.success && featRes.data != null && mounted) {
+            setState(() {
+              _relatedSermons = featRes.data!
+                  .where((r) => r.id != widget.sermonId)
+                  .take(5)
+                  .toList();
+            });
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   @override
@@ -163,7 +203,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                           children: [
                             const SizedBox(height: AppSpacing.sp2),
                             Text(
-                              widget.sermonTitle ?? 'Walking in Faith',
+                              _title.isNotEmpty ? _title : 'Sermon',
                               style:
                                   AppTextStyles.headingMedium.copyWith(
                                 color: isDark
@@ -186,7 +226,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                   ),
                                   child: const Center(
                                     child: Text(
-                                      'D',
+                                      '',
                                       style: TextStyle(
                                         color: AppColors.textInverse,
                                         fontWeight: FontWeight.w600,
@@ -202,8 +242,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                         CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        widget.sermonSpeaker ??
-                                            'Pastor David Mitchell',
+                                        _speaker.isNotEmpty
+                                            ? _speaker
+                                            : 'Unknown Speaker',
                                         style: AppTextStyles.labelMedium
                                             .copyWith(
                                           color: isDark
@@ -212,7 +253,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                         ),
                                       ),
                                       Text(
-                                        'Jan 12, 2025 \u00B7 1.2K views',
+                                        _dateViews.isNotEmpty
+                                            ? _dateViews
+                                            : '',
                                         style: AppTextStyles.bodySmall
                                             .copyWith(
                                           color: isDark
@@ -302,7 +345,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             ),
                             const SizedBox(height: AppSpacing.sp3),
                             ..._relatedSermons.map(
-                              (s) => _RelatedSermonTile(
+                              (s) => _SermonTile(
                                 sermon: s,
                                 isDark: isDark,
                               ),
@@ -454,7 +497,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             onPressed: () {
                               setState(() {
                                 _progress = (_progress -
-                                        10 / _totalDuration.inSeconds)
+                                        (_totalSeconds > 0
+                                            ? 10 / _totalSeconds
+                                            : 0.0))
                                     .clamp(0.0, 1.0);
                               });
                             },
@@ -491,7 +536,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                             onPressed: () {
                               setState(() {
                                 _progress = (_progress +
-                                        30 / _totalDuration.inSeconds)
+                                        (_totalSeconds > 0
+                                            ? 30 / _totalSeconds
+                                            : 0.0))
                                     .clamp(0.0, 1.0);
                               });
                             },
@@ -540,7 +587,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                 children: [
                                   Text(
                                     _formatDuration(
-                                        _currentPosition),
+                                        Duration(
+                                            seconds:
+                                                (_totalSeconds *
+                                                        _progress)
+                                                    .round())),
                                     style: AppTextStyles.bodySmall
                                         .copyWith(
                                       color: Colors.white70,
@@ -595,7 +646,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                   ),
                                   Text(
                                     _formatDuration(
-                                        _totalDuration),
+                                        Duration(
+                                            seconds:
+                                                _totalSeconds)),
                                     style: AppTextStyles.bodySmall
                                         .copyWith(
                                       color: Colors.white70,
@@ -792,45 +845,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
   }
 
-  // Mock related sermons
-  static const _relatedSermons = [
-    _RelatedSermon(
-      title: 'The Power of Prayer',
-      speaker: 'Pastor Sarah Chen',
-      duration: '38 min',
-      views: '892 views',
-    ),
-    _RelatedSermon(
-      title: 'Grace Upon Grace',
-      speaker: 'Pastor David Mitchell',
-      duration: '45 min',
-      views: '1.4K views',
-    ),
-    _RelatedSermon(
-      title: 'Finding Purpose',
-      speaker: 'Rev. James Williams',
-      duration: '36 min',
-      views: '756 views',
-    ),
-  ];
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// DATA MODELS
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _RelatedSermon {
-  const _RelatedSermon({
-    required this.title,
-    required this.speaker,
-    required this.duration,
-    required this.views,
-  });
-
-  final String title;
-  final String speaker;
-  final String duration;
-  final String views;
+  List<Sermon> _relatedSermons = [];
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -878,13 +893,13 @@ class _VideoAction extends StatelessWidget {
   }
 }
 
-class _RelatedSermonTile extends StatelessWidget {
-  const _RelatedSermonTile({
+class _SermonTile extends StatelessWidget {
+  const _SermonTile({
     required this.sermon,
     required this.isDark,
   });
 
-  final _RelatedSermon sermon;
+  final Sermon sermon;
   final bool isDark;
 
   @override
@@ -893,7 +908,16 @@ class _RelatedSermonTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
       child: AppTapAnimation(
         onTap: () {
-          // TODO: play related sermon
+          // Navigate to this sermon's video
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => VideoPlayerScreen(
+                sermonId: sermon.id,
+                sermonTitle: sermon.title,
+                sermonSpeaker: sermon.speaker,
+              ),
+            ),
+          );
         },
         child: Row(
           children: [
@@ -902,12 +926,20 @@ class _RelatedSermonTile extends StatelessWidget {
               width: 120,
               height: 68,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF1A1A2E),
-                    Color(0xFF0F3460),
-                  ],
-                ),
+                image: sermon.thumbnailUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(sermon.thumbnailUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                gradient: sermon.thumbnailUrl == null
+                    ? const LinearGradient(
+                        colors: [
+                          Color(0xFF1A1A2E),
+                          Color(0xFF0F3460),
+                        ],
+                      )
+                    : null,
                 borderRadius: AppRadius.borderRadiusSm,
               ),
               child: Stack(
@@ -932,7 +964,7 @@ class _RelatedSermonTile extends StatelessWidget {
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        sermon.duration,
+                        sermon.durationFormatted,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -962,7 +994,7 @@ class _RelatedSermonTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    sermon.speaker,
+                    sermon.speaker ?? 'Unknown',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -970,7 +1002,7 @@ class _RelatedSermonTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    sermon.views,
+                    '${sermon.playCount ?? 0} plays',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark

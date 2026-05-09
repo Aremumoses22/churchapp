@@ -1,9 +1,13 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/sermon_providers.dart';
+import '../../core/providers/event_providers.dart';
+import '../../core/providers/user_providers.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
@@ -23,14 +27,14 @@ import '../../shared/widgets/widgets.dart';
 //   8. Community & More / Service & Media rows
 // ──────────────────────────────────────────────────────────────────────────────
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
+class _HomeScreenState extends ConsumerState<HomeScreen>
     with TickerProviderStateMixin {
   late final AnimationController _staggerController;
   late final AnimationController _greetingController;
@@ -94,6 +98,13 @@ class _HomeScreenState extends State<HomeScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _greetingController.forward();
       _waveHand();
+      // Load data from API
+      ref.read(sermonNotifierProvider.notifier).loadInitial();
+      ref.read(eventNotifierProvider.notifier).loadInitial();
+      final uState = ref.read(userNotifierProvider);
+      if (uState.profile == null) {
+        ref.read(userNotifierProvider.notifier).fetchProfile();
+      }
     });
   }
 
@@ -159,7 +170,18 @@ class _HomeScreenState extends State<HomeScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final userName = AuthService.instance.userName ?? 'Friend';
+    // Prefer profile name, fallback to auth service
+    final profile = ref.watch(userNotifierProvider).profile;
+    final userName = profile?.name ??
+        AuthService.instance.userName ??
+        'Friend';
+    final sermonState = ref.watch(sermonNotifierProvider);
+    final eventState = ref.watch(eventNotifierProvider);
+    // First featured / latest sermon
+    final latestSermon =
+        sermonState.sermons.isNotEmpty ? sermonState.sermons.first : null;
+    // Up to 5 upcoming events for the horizontal scroll
+    final upcomingEvents = eventState.events.take(5).toList();
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -262,8 +284,9 @@ class _HomeScreenState extends State<HomeScreen>
                   child: AppQuickAccessCard(
                     label: 'Latest Sermon',
                     icon: Icons.headphones_outlined,
-                    subLabel: 'The Power of Faith',
-                    onTap: () => context.push('/sermons/1'),
+                    subLabel: latestSermon?.title ?? 'Browse sermons',
+                    onTap: () => context.push(
+                        '/sermons/${latestSermon?.id ?? ''}'),
                   ),
                 ),
                 _StaggerItem(
@@ -272,8 +295,11 @@ class _HomeScreenState extends State<HomeScreen>
                   child: AppQuickAccessCard(
                     label: 'Next Event',
                     icon: Icons.calendar_today_outlined,
-                    subLabel: 'Youth Night — Feb 28',
-                    onTap: () => context.push('/events/1'),
+                    subLabel: upcomingEvents.isNotEmpty
+                        ? '${upcomingEvents.first.title} — ${upcomingEvents.first.dateFormatted}'
+                        : 'See all events',
+                    onTap: () => context.push(
+                        '/events/${upcomingEvents.isNotEmpty ? upcomingEvents.first.id : ''}'),
                   ),
                 ),
                 _StaggerItem(
@@ -301,38 +327,31 @@ class _HomeScreenState extends State<HomeScreen>
           SliverToBoxAdapter(
             child: SizedBox(
               height: 212,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.sp4,
-                  vertical: AppSpacing.sp3,
-                ),
-                children: [
-                  AppEventCard(
-                    title: 'Youth Night',
-                    date: 'Feb 28',
-                    location: 'Main Campus',
-                    width: 220,
-                    onTap: () => context.push('/events/1'),
-                  ),
-                  const SizedBox(width: AppSpacing.sp3),
-                  AppEventCard(
-                    title: 'Women Conference',
-                    date: 'Mar 8',
-                    location: 'Fellowship Hall',
-                    width: 220,
-                    onTap: () => context.push('/events/2'),
-                  ),
-                  const SizedBox(width: AppSpacing.sp3),
-                  AppEventCard(
-                    title: 'Easter Celebration',
-                    date: 'Apr 5',
-                    location: 'Church Grounds',
-                    width: 220,
-                    onTap: () => context.push('/events/3'),
-                  ),
-                ],
-              ),
+              child: upcomingEvents.isEmpty
+                  ? const Center(
+                      child: Text('No upcoming events'),
+                    )
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.sp4,
+                        vertical: AppSpacing.sp3,
+                      ),
+                      itemCount: upcomingEvents.length,
+                      separatorBuilder: (_, __) =>
+                          const SizedBox(width: AppSpacing.sp3),
+                      itemBuilder: (context, i) {
+                        final evt = upcomingEvents[i];
+                        return AppEventCard(
+                          title: evt.title,
+                          date: evt.dateFormatted,
+                          location: evt.location ?? '',
+                          width: 220,
+                          onTap: () =>
+                              context.push('/events/${evt.id}'),
+                        );
+                      },
+                    ),
             ),
           ),
 
@@ -353,28 +372,66 @@ class _HomeScreenState extends State<HomeScreen>
                 horizontal: AppSpacing.sp4,
                 vertical: AppSpacing.sp3,
               ),
-              child: AppFeatureCard(
-                title: 'The Power of Faith',
-                subtitle: 'Pastor James \u00b7 42 min',
-                thumbnailIcon: Container(
-                  color: isDark ? AppColors.skyDark : AppColors.skyLight,
-                  child: Icon(Icons.headphones, size: 32,
-                      color: isDark
-                          ? AppColors.primaryLight
-                          : AppColors.primary),
-                ),
-                trailing: Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.primaryLight : AppColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.play_arrow,
-                      color: AppColors.textInverse, size: 20),
-                ),
-                onTap: () => context.push('/sermons/1'),
-              ),
+              child: latestSermon != null
+                  ? AppFeatureCard(
+                      title: latestSermon.title,
+                      subtitle:
+                          '${latestSermon.speaker ?? 'Unknown'} \u00b7 ${latestSermon.durationFormatted}',
+                      thumbnailIcon: latestSermon.thumbnailUrl != null
+                          ? Image.network(latestSermon.thumbnailUrl!,
+                              fit: BoxFit.cover)
+                          : Container(
+                              color: isDark
+                                  ? AppColors.skyDark
+                                  : AppColors.skyLight,
+                              child: Icon(Icons.headphones,
+                                  size: 32,
+                                  color: isDark
+                                      ? AppColors.primaryLight
+                                      : AppColors.primary),
+                            ),
+                      trailing: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.play_arrow,
+                            color: AppColors.textInverse, size: 20),
+                      ),
+                      onTap: () =>
+                          context.push('/sermons/${latestSermon.id}'),
+                    )
+                  : AppFeatureCard(
+                      title: 'Browse Sermons',
+                      subtitle: 'Listen to the latest messages',
+                      thumbnailIcon: Container(
+                        color: isDark
+                            ? AppColors.skyDark
+                            : AppColors.skyLight,
+                        child: Icon(Icons.headphones,
+                            size: 32,
+                            color: isDark
+                                ? AppColors.primaryLight
+                                : AppColors.primary),
+                      ),
+                      trailing: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.play_arrow,
+                            color: AppColors.textInverse, size: 20),
+                      ),
+                      onTap: () => context.go(AppRoutes.sermons),
+                    ),
             ),
           ),
 

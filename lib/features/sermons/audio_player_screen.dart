@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/sermon.dart';
+import '../../core/providers/sermon_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -11,7 +14,7 @@ import '../../shared/widgets/widgets.dart';
 // scrubber, speed control (0.5×–2×), sleep timer, queue/up-next list.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class AudioPlayerScreen extends StatefulWidget {
+class AudioPlayerScreen extends ConsumerStatefulWidget {
   const AudioPlayerScreen({
     super.key,
     this.sermonId,
@@ -26,39 +29,25 @@ class AudioPlayerScreen extends StatefulWidget {
   final String? sermonSeries;
 
   @override
-  State<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
+  ConsumerState<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
 }
 
-class _AudioPlayerScreenState extends State<AudioPlayerScreen>
+class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     with SingleTickerProviderStateMixin {
   bool _isPlaying = false;
-  double _progress = 0.35;
+  double _progress = 0.0;
   double _playbackSpeed = 1.0;
   int? _sleepTimerMinutes;
   late AnimationController _playPauseController;
 
-  // Mock data
-  final _currentPosition = const Duration(minutes: 14, seconds: 48);
-  final _totalDuration = const Duration(minutes: 42, seconds: 15);
+  // Resolved from API or fallback params
+  String _title = '';
+  String _speaker = '';
+  String _seriesName = '';
+  int _totalSeconds = 0;
 
-  // Queue
-  final _queue = const [
-    _QueueItem(
-      title: 'The Power of Prayer',
-      speaker: 'Pastor Sarah Chen',
-      duration: '38 min',
-    ),
-    _QueueItem(
-      title: 'Grace Upon Grace',
-      speaker: 'Pastor David Mitchell',
-      duration: '45 min',
-    ),
-    _QueueItem(
-      title: 'Finding Purpose',
-      speaker: 'Rev. James Williams',
-      duration: '36 min',
-    ),
-  ];
+  // Queue — loaded from featured sermons
+  List<Sermon> _queue = [];
 
   static const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
@@ -69,6 +58,32 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _title = widget.sermonTitle ?? '';
+    _speaker = widget.sermonSpeaker ?? '';
+    _seriesName = widget.sermonSeries ?? '';
+    _loadSermonDetails();
+  }
+
+  Future<void> _loadSermonDetails() async {
+    if (widget.sermonId == null) return;
+    try {
+      final repo = ref.read(sermonRepositoryProvider);
+      final res = await repo.getSermon(widget.sermonId!);
+      if (res.success && res.data != null && mounted) {
+        final s = res.data!;
+        setState(() {
+          _title = s.title;
+          _speaker = s.speaker ?? _speaker;
+          _seriesName = s.series?.title ?? _seriesName;
+          _totalSeconds = s.duration ?? 0;
+        });
+      }
+      // Load queue from featured
+      final fRes = await repo.getFeatured();
+      if (fRes.success && fRes.data != null && mounted) {
+        setState(() => _queue = (fRes.data as List<Sermon>? ?? []).take(3).toList());
+      }
+    } catch (_) {}
   }
 
   @override
@@ -150,9 +165,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                           fontSize: 10,
                         ),
                       ),
-                      if (widget.sermonSeries != null)
+                      if (_seriesName.isNotEmpty)
                         Text(
-                          widget.sermonSeries ?? '',
+                          _seriesName,
                           style: AppTextStyles.labelSmall.copyWith(
                             color: isDark
                                 ? AppColors.primaryLight
@@ -268,7 +283,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                       child: Column(
                         children: [
                           Text(
-                            widget.sermonTitle ?? 'Walking in Faith',
+                            _title.isNotEmpty ? _title : 'Sermon',
                             style: AppTextStyles.headingLarge.copyWith(
                               color: isDark
                                   ? AppColors.textPrimaryDark
@@ -280,8 +295,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                           ),
                           const SizedBox(height: AppSpacing.sp2),
                           Text(
-                            widget.sermonSpeaker ??
-                                'Pastor David Mitchell',
+                            _speaker.isNotEmpty
+                                ? _speaker
+                                : 'Unknown Speaker',
                             style: AppTextStyles.bodyMedium.copyWith(
                               color: isDark
                                   ? AppColors.textSecondaryDark
@@ -336,7 +352,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                                   MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  _formatDuration(_currentPosition),
+                                  _formatDuration(Duration(seconds: (_totalSeconds * _progress).round())),
                                   style:
                                       AppTextStyles.bodySmall.copyWith(
                                     color: isDark
@@ -345,7 +361,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                                   ),
                                 ),
                                 Text(
-                                  '-${_formatDuration(_totalDuration - _currentPosition)}',
+                                  '-${_formatDuration(Duration(seconds: (_totalSeconds * (1 - _progress)).round()))}',
                                   style:
                                       AppTextStyles.bodySmall.copyWith(
                                     color: isDark
@@ -400,7 +416,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                             HapticFeedback.lightImpact();
                             setState(() {
                               _progress =
-                                  (_progress - 15 / _totalDuration.inSeconds)
+                                  (_progress - 15 / (_totalSeconds > 0 ? _totalSeconds : 2520))
                                       .clamp(0.0, 1.0);
                             });
                           },
@@ -476,7 +492,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                             HapticFeedback.lightImpact();
                             setState(() {
                               _progress =
-                                  (_progress + 30 / _totalDuration.inSeconds)
+                                  (_progress + 30 / (_totalSeconds > 0 ? _totalSeconds : 2520))
                                       .clamp(0.0, 1.0);
                             });
                           },
@@ -610,8 +626,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                       ),
                       const SizedBox(height: AppSpacing.sp3),
                       ..._queue.asMap().entries.map((entry) =>
-                          _QueueItemTile(
-                            item: entry.value,
+                          _SermonQueueTile(
+                            sermon: entry.value,
                             index: entry.key + 1,
                             isDark: isDark,
                           )),
@@ -773,22 +789,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
-// DATA MODEL
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _QueueItem {
-  const _QueueItem({
-    required this.title,
-    required this.speaker,
-    required this.duration,
-  });
-
-  final String title;
-  final String speaker;
-  final String duration;
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
 // PRIVATE SUB-WIDGETS
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -841,14 +841,14 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _QueueItemTile extends StatelessWidget {
-  const _QueueItemTile({
-    required this.item,
+class _SermonQueueTile extends StatelessWidget {
+  const _SermonQueueTile({
+    required this.sermon,
     required this.index,
     required this.isDark,
   });
 
-  final _QueueItem item;
+  final Sermon sermon;
   final int index;
   final bool isDark;
 
@@ -861,7 +861,6 @@ class _QueueItemTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Index
           SizedBox(
             width: 24,
             child: Text(
@@ -875,7 +874,6 @@ class _QueueItemTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: AppSpacing.sp3),
-          // Thumbnail
           Container(
             width: 44,
             height: 44,
@@ -885,13 +883,17 @@ class _QueueItemTile extends StatelessWidget {
                   : AppGradients.hero,
               borderRadius: AppRadius.borderRadiusSm,
             ),
-            child: const Center(
-              child: Icon(
-                Icons.headphones,
-                color: AppColors.textInverse,
-                size: 20,
-              ),
-            ),
+            child: sermon.thumbnailUrl != null
+                ? ClipRRect(
+                    borderRadius: AppRadius.borderRadiusSm,
+                    child: Image.network(sermon.thumbnailUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.headphones,
+                                color: AppColors.textInverse, size: 20))))
+                : const Center(
+                    child: Icon(Icons.headphones,
+                        color: AppColors.textInverse, size: 20)),
           ),
           const SizedBox(width: AppSpacing.sp3),
           Expanded(
@@ -899,7 +901,7 @@ class _QueueItemTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.title,
+                  sermon.title,
                   style: AppTextStyles.bodyMedium.copyWith(
                     color: isDark
                         ? AppColors.textPrimaryDark
@@ -911,7 +913,7 @@ class _QueueItemTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${item.speaker} \u00B7 ${item.duration}',
+                  '${sermon.speaker ?? ''} · ${sermon.durationFormatted}',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: isDark
                         ? AppColors.textSecondaryDark

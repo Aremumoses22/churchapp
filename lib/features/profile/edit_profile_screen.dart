@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/user_providers.dart';
 import '../../core/theme/theme.dart';
-import '../../core/services/services.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -9,22 +10,24 @@ import '../../shared/widgets/widgets.dart';
 //
 // Full form: avatar with crop placeholder, display name, email, phone,
 // department picker, bio textarea, save button.
+// Now wired to userNotifierProvider.updateProfile().
 // ──────────────────────────────────────────────────────────────────────────────
 
-class EditProfileScreen extends StatefulWidget {
+class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
   @override
-  State<EditProfileScreen> createState() => _EditProfileScreenState();
+  ConsumerState<EditProfileScreen> createState() =>
+      _EditProfileScreenState();
 }
 
-class _EditProfileScreenState extends State<EditProfileScreen> {
+class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _phoneCtrl;
   late final TextEditingController _bioCtrl;
 
-  String _selectedDepartment = 'Media';
+  String _selectedDepartment = 'None';
   bool _saving = false;
 
   static const _departments = [
@@ -43,12 +46,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   void initState() {
     super.initState();
-    final auth = AuthService.instance;
-    _nameCtrl = TextEditingController(text: auth.userName ?? '');
-    _emailCtrl = TextEditingController(text: 'john.doe@email.com');
-    _phoneCtrl = TextEditingController(text: '+1 (555) 123-4567');
-    _bioCtrl = TextEditingController(
-        text: 'Passionate about serving God and community.');
+    final profile = ref.read(userNotifierProvider).profile;
+    _nameCtrl = TextEditingController(text: profile?.name ?? '');
+    _emailCtrl = TextEditingController(text: profile?.email ?? '');
+    _phoneCtrl = TextEditingController(text: profile?.phone ?? '');
+    _bioCtrl = TextEditingController(text: profile?.bio ?? '');
+    _selectedDepartment = profile?.department ?? 'None';
+    if (!_departments.contains(_selectedDepartment)) {
+      _selectedDepartment = 'None';
+    }
   }
 
   @override
@@ -62,23 +68,41 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   Future<void> _save() async {
     setState(() => _saving = true);
-    await Future.delayed(const Duration(seconds: 1));
+    final success =
+        await ref.read(userNotifierProvider.notifier).updateProfile(
+              name: _nameCtrl.text.trim(),
+              phone: _phoneCtrl.text.trim(),
+              bio: _bioCtrl.text.trim(),
+              department: _selectedDepartment,
+            );
     if (!mounted) return;
     setState(() => _saving = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: const Text('Profile updated successfully!'),
-      backgroundColor: AppColors.success,
-      behavior: SnackBarBehavior.floating,
-      shape:
-          RoundedRectangleBorder(borderRadius: AppRadius.borderRadiusSm),
-    ));
-    Navigator.of(context).pop();
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Profile updated successfully!'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusSm),
+      ));
+      Navigator.of(context).pop();
+    } else {
+      final err = ref.read(userNotifierProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(err ?? 'Failed to update profile'),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.borderRadiusSm),
+      ));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final initial = _nameCtrl.text.isNotEmpty ? _nameCtrl.text[0] : 'U';
+    final profile = ref.watch(userNotifierProvider).profile;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -106,13 +130,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       backgroundColor: isDark
                           ? AppColors.primaryLight
                           : AppColors.skyLight,
-                      child: Text(
-                        initial.toUpperCase(),
-                        style: AppTextStyles.displayLarge.copyWith(
-                            color: isDark
-                                ? Colors.white
-                                : AppColors.primary),
-                      ),
+                      backgroundImage: profile?.avatarUrl != null
+                          ? NetworkImage(profile!.avatarUrl!)
+                          : null,
+                      child: profile?.avatarUrl == null
+                          ? Text(
+                              initial.toUpperCase(),
+                              style: AppTextStyles.displayLarge.copyWith(
+                                  color: isDark
+                                      ? Colors.white
+                                      : AppColors.primary),
+                            )
+                          : null,
                     ),
                   ),
                   Positioned(

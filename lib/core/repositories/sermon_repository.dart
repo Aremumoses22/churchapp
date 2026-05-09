@@ -1,115 +1,164 @@
-import 'dart:ui';
+import 'package:dio/dio.dart';
 
+import '../config/api_config.dart';
+import '../models/api_response.dart';
 import '../models/sermon.dart';
+import '../services/api_client.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// SERMON REPOSITORY
+// SERMON REPOSITORY — §5 Sermons Endpoints
 // ──────────────────────────────────────────────────────────────────────────────
 
-abstract class SermonRepository {
-  List<Sermon> getSermons();
-  List<SermonSeries> getSeries();
-  String get nowPlayingTitle;
-  String get nowPlayingSpeaker;
-  double get nowPlayingProgress;
-}
+class SermonRepository {
+  SermonRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+  final Dio _dio;
 
-class MockSermonRepository implements SermonRepository {
-  @override
-  String get nowPlayingTitle => 'The Power of Faith';
+  // ── GET /sermons ──────────────────────────────────────────────────────────
+  Future<PaginatedResponse<Sermon>> getSermons({
+    int page = 1,
+    int limit = 20,
+    String? seriesId,
+    String? search,
+  }) async {
+    final params = <String, dynamic>{
+      'page': page,
+      'limit': limit,
+    };
+    if (seriesId != null) params['seriesId'] = seriesId;
+    if (search != null && search.isNotEmpty) params['search'] = search;
 
-  @override
-  String get nowPlayingSpeaker => 'Pastor James';
+    final res =
+        await _dio.get(Endpoints.sermons, queryParameters: params);
+    return PaginatedResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => Sermon.fromJson(json as Map<String, dynamic>),
+    );
+  }
 
-  @override
-  double get nowPlayingProgress => 0.35;
+  // ── GET /sermons/featured ─────────────────────────────────────────────────
+  Future<ApiResponse<List<Sermon>>> getFeatured() async {
+    final res = await _dio.get(Endpoints.sermonsFeatured);
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) {
+        if (json is List) {
+          return json
+              .map((e) => Sermon.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+        return <Sermon>[];
+      },
+    );
+  }
 
-  @override
-  List<SermonSeries> getSeries() => const [
-        SermonSeries(
-            id: 's1',
-            title: 'Faith Series',
-            subtitle: '6 sermons',
-            emoji: '\u{1F525}',
-            color: Color(0xFF1E40AF)),
-        SermonSeries(
-            id: 's2',
-            title: 'Grace & Mercy',
-            subtitle: '4 sermons',
-            emoji: '\u{1F54A}\u{FE0F}',
-            color: Color(0xFF7C3AED)),
-        SermonSeries(
-            id: 's3',
-            title: 'Worship',
-            subtitle: '5 sermons',
-            emoji: '\u{1F3B5}',
-            color: Color(0xFFF59E0B)),
-        SermonSeries(
-            id: 's4',
-            title: 'New Beginnings',
-            subtitle: '3 sermons',
-            emoji: '\u{1F331}',
-            color: Color(0xFF10B981)),
-        SermonSeries(
-            id: 's5',
-            title: 'Family Matters',
-            subtitle: '8 sermons',
-            emoji: '\u{1F46A}',
-            color: Color(0xFFEF4444)),
-      ];
+  // ── GET /sermons/saved ────────────────────────────────────────────────────
+  Future<ApiResponse<List<Sermon>>> getSaved() async {
+    final res = await _dio.get(Endpoints.sermonsSaved);
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) {
+        if (json is List) {
+          return json
+              .map((e) => Sermon.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+        return <Sermon>[];
+      },
+    );
+  }
 
-  @override
-  List<Sermon> getSermons() => const [
-        Sermon(
-          id: '1',
-          title: 'The Power of Faith',
-          speaker: 'Pastor James',
-          duration: '42 min',
-          series: 'Faith Series',
-          date: 'Feb 23, 2026',
-          downloadState: DownloadState.downloaded,
-        ),
-        Sermon(
-          id: '2',
-          title: 'Walking in Grace',
-          speaker: 'Pastor James',
-          duration: '38 min',
-          series: 'Grace & Mercy',
-          date: 'Feb 16, 2026',
-        ),
-        Sermon(
-          id: '3',
-          title: 'The Heart of Worship',
-          speaker: 'Pastor Sarah',
-          duration: '45 min',
-          series: 'Worship',
-          date: 'Feb 9, 2026',
-          downloadState: DownloadState.downloading,
-          downloadProgress: 0.65,
-        ),
-        Sermon(
-          id: '4',
-          title: 'Building Strong Foundations',
-          speaker: 'Guest: Bishop Thomas',
-          duration: '51 min',
-          date: 'Feb 2, 2026',
-        ),
-        Sermon(
-          id: '5',
-          title: 'Love Without Limits',
-          speaker: 'Pastor James',
-          duration: '39 min',
-          series: 'Faith Series',
-          date: 'Jan 26, 2026',
-          downloadState: DownloadState.downloaded,
-        ),
-        Sermon(
-          id: '6',
-          title: 'Pressing Forward',
-          speaker: 'Pastor Sarah',
-          duration: '44 min',
-          series: 'New Beginnings',
-          date: 'Jan 19, 2026',
-        ),
-      ];
+  // ── GET /sermons/:id ─────────────────────────────────────────────────────
+  Future<ApiResponse<Sermon>> getSermon(String id) async {
+    final res = await _dio.get(Endpoints.sermon(id));
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => Sermon.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  // ── GET /sermons/:id/stream ───────────────────────────────────────────────
+  Future<ApiResponse<SermonStreamInfo>> getStreamUrl(String id) async {
+    final res = await _dio.get(Endpoints.sermonStream(id));
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => SermonStreamInfo.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  // ── POST /sermons/:id/progress ────────────────────────────────────────────
+  Future<ApiResponse<void>> saveProgress({
+    required String sermonId,
+    required int position, // seconds
+    bool completed = false,
+  }) async {
+    final res = await _dio.post(
+      Endpoints.sermonProgress(sermonId),
+      data: {'position': position, 'completed': completed},
+    );
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (_) {},
+    );
+  }
+
+  // ── POST /sermons/:id/save (toggle bookmark) ─────────────────────────────
+  Future<ApiResponse<Map<String, dynamic>>> toggleSave(String id) async {
+    final res = await _dio.post(Endpoints.sermonSave(id));
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => json is Map<String, dynamic> ? json : <String, dynamic>{},
+    );
+  }
+
+  // ── GET /sermons/:id/notes ────────────────────────────────────────────────
+  Future<ApiResponse<SermonNote?>> getNotes(String sermonId) async {
+    final res = await _dio.get(Endpoints.sermonNotes(sermonId));
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => json != null
+          ? SermonNote.fromJson(json as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  // ── PUT /sermons/:id/notes ────────────────────────────────────────────────
+  Future<ApiResponse<SermonNote>> saveNotes({
+    required String sermonId,
+    required String content,
+  }) async {
+    final res = await _dio.put(
+      Endpoints.sermonNotes(sermonId),
+      data: {'content': content},
+    );
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => SermonNote.fromJson(json as Map<String, dynamic>),
+    );
+  }
+
+  // ── GET /sermons/series/all ───────────────────────────────────────────────
+  Future<ApiResponse<List<SermonSeries>>> getAllSeries() async {
+    final res = await _dio.get(Endpoints.sermonSeriesAll);
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) {
+        if (json is List) {
+          return json
+              .map((e) =>
+                  SermonSeries.fromJson(e as Map<String, dynamic>))
+              .toList();
+        }
+        return <SermonSeries>[];
+      },
+    );
+  }
+
+  // ── GET /sermons/series/:id ───────────────────────────────────────────────
+  Future<ApiResponse<SermonSeries>> getSeries(String id) async {
+    final res = await _dio.get(Endpoints.sermonSeries(id));
+    return ApiResponse.fromJson(
+      res.data as Map<String, dynamic>,
+      fromJsonT: (json) => SermonSeries.fromJson(json as Map<String, dynamic>),
+    );
+  }
 }

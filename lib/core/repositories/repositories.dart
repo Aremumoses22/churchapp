@@ -12,3 +12,4 @@ export 'giving_repository.dart';
 export 'notification_repository.dart';
 export 'search_repository.dart';
 export 'sermon_repository.dart';
+export 'user_repository.dart';

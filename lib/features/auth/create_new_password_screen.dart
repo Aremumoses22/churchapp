@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -15,18 +17,19 @@ import '../../shared/widgets/widgets.dart';
 // Success state: checkmark + "Password Updated" → Back to Sign In.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class CreateNewPasswordScreen extends StatefulWidget {
+class CreateNewPasswordScreen extends ConsumerStatefulWidget {
   const CreateNewPasswordScreen({super.key, this.token});
 
   /// The password-reset token passed via deep link.
   final String? token;
 
   @override
-  State<CreateNewPasswordScreen> createState() =>
+  ConsumerState<CreateNewPasswordScreen> createState() =>
       _CreateNewPasswordScreenState();
 }
 
-class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
+class _CreateNewPasswordScreenState
+    extends ConsumerState<CreateNewPasswordScreen> {
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
 
@@ -52,19 +55,35 @@ class _CreateNewPasswordScreenState extends State<CreateNewPasswordScreen> {
       return;
     }
 
+    final token = widget.token;
+    if (token == null || token.isEmpty) {
+      setState(() => _errorMessage = 'Invalid or missing reset token.');
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
-    // TODO: Replace with real password-reset API call using widget.token.
-    await Future.delayed(const Duration(seconds: 2));
+    final success = await ref
+        .read(authNotifierProvider.notifier)
+        .resetPassword(token: token, password: password);
+
     if (!mounted) return;
 
-    setState(() {
-      _isLoading = false;
-      _isSuccess = true;
-    });
+    if (success) {
+      setState(() {
+        _isLoading = false;
+        _isSuccess = true;
+      });
+    } else {
+      final authState = ref.read(authNotifierProvider);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = authState.error ?? 'Failed to reset password.';
+      });
+    }
   }
 
   @override
