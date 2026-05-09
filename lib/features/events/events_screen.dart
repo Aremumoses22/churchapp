@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -957,49 +958,80 @@ class _EventCardState extends State<_EventCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner image placeholder
-            Container(
+            // Banner image
+            SizedBox(
               height: 160,
               width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    widget.event.imageColor,
-                    widget.event.imageColor.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
-              child: Stack(
-                children: [
-                  Center(
-                    child: Icon(Icons.event,
-                        color: Colors.white.withValues(alpha: 0.3),
-                        size: 64),
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: widget.isDark
-                            ? AppColors.primaryLight
-                            : AppColors.primary,
-                        borderRadius: AppRadius.borderRadiusSm,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppRadius.xl)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    CachedNetworkImage(
+                      imageUrl:
+                          'https://picsum.photos/seed/${widget.event.id}/800/400',
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              widget.event.imageColor,
+                              widget.event.imageColor
+                                  .withValues(alpha: 0.7),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: Text(
-                        widget.event.date
-                            .split('\u00b7')
-                            .first
-                            .trim(),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.textInverse,
+                      errorWidget: (_, __, ___) => Container(
+                        color: widget.event.imageColor,
+                        child: Icon(Icons.event,
+                            color: Colors.white.withValues(alpha: 0.3),
+                            size: 64),
+                      ),
+                    ),
+                    // Dark gradient overlay at bottom
+                    Positioned(
+                      bottom: 0, left: 0, right: 0,
+                      child: Container(
+                        height: 60,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.45),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: widget.isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                          borderRadius: AppRadius.borderRadiusSm,
+                        ),
+                        child: Text(
+                          widget.event.date
+                              .split('\u00b7')
+                              .first
+                              .trim(),
+                          style: AppTextStyles.bodySmall.copyWith(
+                            color: AppColors.textInverse,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             // Content
@@ -1117,42 +1149,27 @@ class _EventCardState extends State<_EventCard>
                         separatorBuilder: (_, _) =>
                             const SizedBox(width: 8),
                         itemBuilder: (_, i) {
-                          final color = widget.event.pastPhotos[i];
                           return ClipRRect(
                             borderRadius: AppRadius.borderRadiusSm,
-                            child: Container(
+                            child: CachedNetworkImage(
+                              imageUrl:
+                                  'https://picsum.photos/seed/${widget.event.id}_$i/144/104',
                               width: 72,
                               height: 52,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    color,
-                                    color.withValues(alpha: 0.6),
-                                  ],
-                                ),
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(
+                                width: 72,
+                                height: 52,
+                                color: widget.event.pastPhotos[i],
                               ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Icon(Icons.photo,
-                                      size: 18,
-                                      color: Colors.white
-                                          .withValues(alpha: 0.4)),
-                                  Positioned(
-                                    bottom: 2,
-                                    right: 4,
-                                    child: Text(
-                                      '202${4 - i}',
-                                      style: AppTextStyles.labelSmall
-                                          .copyWith(
-                                        color: Colors.white70,
-                                        fontSize: 8,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              errorWidget: (_, __, ___) => Container(
+                                width: 72,
+                                height: 52,
+                                color: widget.event.pastPhotos[i],
+                                child: Icon(Icons.photo,
+                                    size: 18,
+                                    color: Colors.white
+                                        .withValues(alpha: 0.4)),
                               ),
                             ),
                           );

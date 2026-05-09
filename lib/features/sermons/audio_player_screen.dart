@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
@@ -31,15 +32,26 @@ class AudioPlayerScreen extends StatefulWidget {
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen>
     with SingleTickerProviderStateMixin {
-  bool _isPlaying = false;
-  double _progress = 0.35;
-  double _playbackSpeed = 1.0;
-  int? _sleepTimerMinutes;
+  // ── Online demo audio – replace with your sermon CDN/podcast URL ──────────
+  static const _audioUrl =
+      'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3';
+
+  late final AudioPlayer _player;
   late AnimationController _playPauseController;
 
-  // Mock data
-  final _currentPosition = const Duration(minutes: 14, seconds: 48);
-  final _totalDuration = const Duration(minutes: 42, seconds: 15);
+  double _playbackSpeed = 1.0;
+  int? _sleepTimerMinutes;
+
+  // Derived from player streams
+  Duration _position = Duration.zero;
+  Duration _duration = Duration.zero;
+
+  double get _progress =>
+      _duration.inMilliseconds > 0
+          ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
+          : 0.0;
+
+  static const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
   // Queue
   final _queue = const [
@@ -60,30 +72,54 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
     ),
   ];
 
-  static const _speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-
   @override
   void initState() {
     super.initState();
+    _player = AudioPlayer();
     _playPauseController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _player.playingStream.listen((playing) {
+      if (mounted) {
+        if (playing) {
+          _playPauseController.forward();
+        } else {
+          _playPauseController.reverse();
+        }
+        setState(() {});
+      }
+    });
+    _player.positionStream.listen((pos) {
+      if (mounted) setState(() => _position = pos);
+    });
+    _player.durationStream.listen((dur) {
+      if (mounted && dur != null) setState(() => _duration = dur);
+    });
+    _loadAudio();
+  }
+
+  Future<void> _loadAudio() async {
+    try {
+      await _player.setUrl(_audioUrl);
+    } catch (_) {
+      // Handle error gracefully
+    }
   }
 
   @override
   void dispose() {
+    _player.dispose();
     _playPauseController.dispose();
     super.dispose();
   }
 
   void _togglePlayPause() {
     HapticFeedback.lightImpact();
-    setState(() => _isPlaying = !_isPlaying);
-    if (_isPlaying) {
-      _playPauseController.forward();
+    if (_player.playing) {
+      _player.pause();
     } else {
-      _playPauseController.reverse();
+      _player.play();
     }
   }
 
@@ -92,6 +128,24 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
     final currentIndex = _speeds.indexOf(_playbackSpeed);
     final nextIndex = (currentIndex + 1) % _speeds.length;
     setState(() => _playbackSpeed = _speeds[nextIndex]);
+    _player.setSpeed(_playbackSpeed);
+  }
+
+  void _seekTo(double progress) {
+    final ms = (progress * _duration.inMilliseconds).round();
+    _player.seek(Duration(milliseconds: ms));
+  }
+
+  void _skipBack15() {
+    HapticFeedback.lightImpact();
+    final newPos = Duration(milliseconds: (_position.inMilliseconds - 15000).clamp(0, _duration.inMilliseconds));
+    _player.seek(newPos);
+  }
+
+  void _skipForward30() {
+    HapticFeedback.lightImpact();
+    final newPos = Duration(milliseconds: (_position.inMilliseconds + 30000).clamp(0, _duration.inMilliseconds));
+    _player.seek(newPos);
   }
 
   String _formatDuration(Duration d) {
@@ -322,9 +376,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                             ),
                             child: Slider(
                               value: _progress,
-                              onChanged: (val) {
-                                setState(() => _progress = val);
-                              },
+                              onChanged: _seekTo,
                             ),
                           ),
                           Padding(
@@ -336,7 +388,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                                   MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  _formatDuration(_currentPosition),
+                                  _formatDuration(_position),
                                   style:
                                       AppTextStyles.bodySmall.copyWith(
                                     color: isDark
@@ -345,7 +397,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
                                   ),
                                 ),
                                 Text(
-                                  '-${_formatDuration(_totalDuration - _currentPosition)}',
+                                  '-${_formatDuration(_duration - _position)}',
                                   style:
                                       AppTextStyles.bodySmall.copyWith(
                                     color: isDark
@@ -396,14 +448,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 
                         // Skip back 15s
                         AppTapAnimation(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _progress =
-                                  (_progress - 15 / _totalDuration.inSeconds)
-                                      .clamp(0.0, 1.0);
-                            });
-                          },
+                          onTap: _skipBack15,
                           child: SizedBox(
                             width: 48,
                             height: 48,
@@ -472,14 +517,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 
                         // Skip forward 30s
                         AppTapAnimation(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _progress =
-                                  (_progress + 30 / _totalDuration.inSeconds)
-                                      .clamp(0.0, 1.0);
-                            });
-                          },
+                          onTap: _skipForward30,
                           child: SizedBox(
                             width: 48,
                             height: 48,

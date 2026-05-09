@@ -13,6 +13,10 @@ dependencies:
   go_router: ^17.1.0
   google_fonts: ^6.2.1
   shared_preferences: ^2.5.4
+  video_player: ^2.9.2
+  chewie: ^1.10.0
+  just_audio: ^0.9.43
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

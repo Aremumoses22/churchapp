@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/theme.dart';
@@ -95,10 +96,11 @@ class AppFeatureCard extends StatelessWidget {
                   width: 80,
                   height: 80,
                   child: thumbnailUrl != null
-                      ? Image.network(
-                          thumbnailUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: thumbnailUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => _placeholderBox(isDark),
+                          placeholder: (_, __) => _placeholderBox(isDark),
+                          errorWidget: (_, __, ___) => _placeholderBox(isDark),
                         )
                       : thumbnailIcon ?? _placeholderBox(isDark),
                 ),
@@ -331,8 +333,11 @@ class AppEventCard extends StatelessWidget {
                     width: double.infinity,
                     height: 120,
                     child: imageUrl != null
-                        ? Image.network(imageUrl!, fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => _imagePlaceholder(isDark),
+                            errorWidget: (_, __, ___) =>
                                 _imagePlaceholder(isDark))
                         : _imagePlaceholder(isDark),
                   ),

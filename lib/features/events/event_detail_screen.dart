@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -40,16 +41,33 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: isDark
-                              ? AppGradients.heroDark
-                              : AppGradients.hero,
+                      CachedNetworkImage(
+                        imageUrl:
+                            'https://picsum.photos/seed/event_${widget.eventId}/800/480',
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          decoration: BoxDecoration(
+                            gradient: isDark
+                                ? AppGradients.heroDark
+                                : AppGradients.hero,
+                          ),
+                          child: Center(
+                            child: Icon(Icons.event,
+                                color: Colors.white.withValues(alpha: 0.3),
+                                size: 80),
+                          ),
                         ),
-                        child: Center(
-                          child: Icon(Icons.event,
-                              color: Colors.white.withValues(alpha: 0.3),
-                              size: 80),
+                        errorWidget: (_, __, ___) => Container(
+                          decoration: BoxDecoration(
+                            gradient: isDark
+                                ? AppGradients.heroDark
+                                : AppGradients.hero,
+                          ),
+                          child: Center(
+                            child: Icon(Icons.event,
+                                color: Colors.white.withValues(alpha: 0.3),
+                                size: 80),
+                          ),
                         ),
                       ),
                       // Back + Share overlays

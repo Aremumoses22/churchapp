@@ -10,13 +10,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _themePrefKey = 'app_theme_mode';
 
 class ThemeNotifier extends StateNotifier<ThemeMode> {
-  ThemeNotifier() : super(ThemeMode.system) {
+  ThemeNotifier() : super(ThemeMode.dark) {
     _load();
   }
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final index = prefs.getInt(_themePrefKey) ?? 0;
+    final index = prefs.getInt(_themePrefKey) ?? 2; // default: dark
     state = ThemeMode.values[index.clamp(0, ThemeMode.values.length - 1)];
   }
 

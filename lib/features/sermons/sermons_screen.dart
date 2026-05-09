@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -229,14 +230,6 @@ class _SeriesCoverCard extends StatelessWidget {
       child: Container(
         width: 130,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              series.color,
-              series.color.withValues(alpha: 0.7),
-            ],
-          ),
           borderRadius: AppRadius.borderRadiusLg,
           boxShadow: [
             BoxShadow(
@@ -246,30 +239,39 @@ class _SeriesCoverCard extends StatelessWidget {
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // Background pattern (subtle circles)
-            Positioned(
-              right: -20,
-              bottom: -20,
-              child: Container(
-                width: 80,
-                height: 80,
+            // Background image
+            CachedNetworkImage(
+              imageUrl:
+                  'https://picsum.photos/seed/series_${series.id}/260/320',
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(
                 decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      series.color,
+                      series.color.withValues(alpha: 0.7),
+                    ],
+                  ),
                 ),
               ),
+              errorWidget: (_, __, ___) => Container(color: series.color),
             ),
-            Positioned(
-              left: -10,
-              top: -10,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.06),
+            // Gradient overlay
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.15),
+                    series.color.withValues(alpha: 0.85),
+                  ],
                 ),
               ),
             ),
@@ -341,38 +343,49 @@ class _SermonCardState extends State<_SermonCard> {
         ),
         child: Row(
           children: [
-            // Thumbnail with waveform
+            // Thumbnail with image
             Padding(
               padding: const EdgeInsets.all(AppSpacing.sp3),
               child: ClipRRect(
                 borderRadius: AppRadius.borderRadiusLg,
-                child: Container(
+                child: SizedBox(
                   width: 80,
                   height: 84,
-                  color:
-                      widget.isDark ? AppColors.skyDark : AppColors.skyLight,
                   child: Stack(
-                    alignment: Alignment.center,
+                    fit: StackFit.expand,
                     children: [
-                      // Waveform bars
-                      CustomPaint(
-                        size: const Size(80, 84),
-                        painter: _WaveformPainter(
-                          color: (widget.isDark
-                                  ? AppColors.primaryLight
-                                  : AppColors.primary)
-                              .withValues(alpha: 0.2),
-                          barCount: 20,
-                          seed: widget.sermon.id.hashCode,
+                      CachedNetworkImage(
+                        imageUrl:
+                            'https://picsum.photos/seed/sermon_${widget.sermon.id}/160/168',
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => Container(
+                          color: widget.isDark
+                              ? AppColors.skyDark
+                              : AppColors.skyLight,
+                        ),
+                        errorWidget: (_, __, ___) => Container(
+                          color: widget.isDark
+                              ? AppColors.skyDark
+                              : AppColors.skyLight,
+                          child: Icon(
+                            Icons.headphones_outlined,
+                            size: 28,
+                            color: widget.isDark
+                                ? AppColors.primaryLight
+                                : AppColors.primary,
+                          ),
                         ),
                       ),
-                      // Play icon overlay
-                      Icon(
-                        Icons.headphones_outlined,
-                        size: 28,
-                        color: widget.isDark
-                            ? AppColors.primaryLight
-                            : AppColors.primary,
+                      // Overlay
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.25),
+                      ),
+                      Center(
+                        child: Icon(
+                          Icons.play_circle_outline,
+                          size: 28,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
                       ),
                     ],
                   ),

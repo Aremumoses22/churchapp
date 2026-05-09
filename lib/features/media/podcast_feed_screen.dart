@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/theme.dart';
@@ -152,27 +153,29 @@ class _PodcastFeedScreenState extends State<PodcastFeedScreen> {
             ),
             child: Row(
               children: [
-                // Podcast art placeholder
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: AppRadius.borderRadiusMd,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.podcasts,
-                          size: 32,
-                          color: Colors.white.withValues(alpha: 0.9)),
-                      const SizedBox(height: 2),
-                      Text('GRACE',
-                          style: AppTextStyles.labelSmall.copyWith(
-                              color: Colors.white.withValues(alpha: 0.8),
-                              fontSize: 8,
-                              letterSpacing: 2)),
-                    ],
+                // Podcast artwork
+                ClipRRect(
+                  borderRadius: AppRadius.borderRadiusMd,
+                  child: CachedNetworkImage(
+                    imageUrl:
+                        'https://picsum.photos/seed/podcast_grace/160/160',
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    placeholder: (_, __) => Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      child: const Icon(Icons.podcasts,
+                          size: 32, color: Colors.white),
+                    ),
+                    errorWidget: (_, __, ___) => Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.white.withValues(alpha: 0.15),
+                      child: const Icon(Icons.podcasts,
+                          size: 32, color: Colors.white),
+                    ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sp4),

@@ -237,6 +237,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             child: AppPrimaryButton(
               label: _isSubmitting ? 'Posting...' : 'Post',
               onPressed: _canSubmit ? _submitPost : null,
+              isFullWidth: false,
             ),
           ),
         ],

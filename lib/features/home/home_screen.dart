@@ -312,6 +312,7 @@ class _HomeScreenState extends State<HomeScreen>
                     title: 'Youth Night',
                     date: 'Feb 28',
                     location: 'Main Campus',
+                    imageUrl: 'https://picsum.photos/seed/youth_night/440/240',
                     width: 220,
                     onTap: () => context.push('/events/1'),
                   ),
@@ -320,6 +321,7 @@ class _HomeScreenState extends State<HomeScreen>
                     title: 'Women Conference',
                     date: 'Mar 8',
                     location: 'Fellowship Hall',
+                    imageUrl: 'https://picsum.photos/seed/women_conf/440/240',
                     width: 220,
                     onTap: () => context.push('/events/2'),
                   ),
@@ -328,6 +330,7 @@ class _HomeScreenState extends State<HomeScreen>
                     title: 'Easter Celebration',
                     date: 'Apr 5',
                     location: 'Church Grounds',
+                    imageUrl: 'https://picsum.photos/seed/easter_cel/440/240',
                     width: 220,
                     onTap: () => context.push('/events/3'),
                   ),
@@ -355,14 +358,8 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               child: AppFeatureCard(
                 title: 'The Power of Faith',
-                subtitle: 'Pastor James \u00b7 42 min',
-                thumbnailIcon: Container(
-                  color: isDark ? AppColors.skyDark : AppColors.skyLight,
-                  child: Icon(Icons.headphones, size: 32,
-                      color: isDark
-                          ? AppColors.primaryLight
-                          : AppColors.primary),
-                ),
+                subtitle: 'Pastor James · 42 min',
+                thumbnailUrl: 'https://picsum.photos/seed/sermon_home/160/160',
                 trailing: Container(
                   width: 40,
                   height: 40,

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -41,14 +42,36 @@ class _SermonDetailScreenState extends State<SermonDetailScreen> {
                 SliverToBoxAdapter(
                   child: Stack(
                     children: [
-                      Container(
+                      SizedBox(
                         height: 250,
                         width: double.infinity,
-                        color: isDark ? AppColors.skyDark : AppColors.skyLight,
-                        child: Icon(Icons.headphones, size: 64,
-                            color: isDark
-                                ? AppColors.primaryLight
-                                : AppColors.primary),
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://picsum.photos/seed/sermon_${widget.sermonId}/800/500',
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color:
+                                isDark ? AppColors.skyDark : AppColors.skyLight,
+                            child: Center(
+                              child: Icon(Icons.headphones,
+                                  size: 64,
+                                  color: isDark
+                                      ? AppColors.primaryLight
+                                      : AppColors.primary),
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color:
+                                isDark ? AppColors.skyDark : AppColors.skyLight,
+                            child: Center(
+                              child: Icon(Icons.headphones,
+                                  size: 64,
+                                  color: isDark
+                                      ? AppColors.primaryLight
+                                      : AppColors.primary),
+                            ),
+                          ),
+                        ),
                       ),
                       // Back button
                       Positioned(

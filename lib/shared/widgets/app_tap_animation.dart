@@ -72,7 +72,7 @@ class _AppTapAnimationState extends State<AppTapAnimation>
       onTapDown: widget.onTap != null ? _onTapDown : null,
       onTapUp: widget.onTap != null ? _onTapUp : null,
       onTapCancel: widget.onTap != null ? _onTapCancel : null,
-      behavior: HitTestBehavior.opaque,
+      behavior: HitTestBehavior.translucent,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {

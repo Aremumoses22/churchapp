@@ -63,10 +63,7 @@ class _ForumScreenState extends ConsumerState<ForumScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.edit_outlined, size: 20),
-        label: Text(
-          'New Post',
-          style: AppTextStyles.labelMedium.copyWith(color: Colors.white),
-        ),
+        label: const Text('New Post'),
       ),
       body: CustomScrollView(
         slivers: [
@@ -225,7 +222,7 @@ class _ForumScreenState extends ConsumerState<ForumScreen> {
           // ── Trending topics list ────────────────────────────────────
           SliverToBoxAdapter(
             child: SizedBox(
-              height: 100,
+              height: 112,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(

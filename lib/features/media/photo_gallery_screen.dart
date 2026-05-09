@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/theme.dart';
@@ -287,43 +288,50 @@ class _PhotoTile extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: baseHeight,
-        decoration: BoxDecoration(
-          color: _seedColor(),
-          borderRadius: AppRadius.borderRadiusMd,
-        ),
-        child: Stack(
-          children: [
-            Center(
-              child: Icon(
-                Icons.image_outlined,
-                size: 32,
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.2)
-                    : Colors.black.withValues(alpha: 0.08),
-              ),
-            ),
-            Positioned(
-              bottom: 6,
-              left: 6,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black45,
-                  borderRadius: AppRadius.borderRadiusXs,
-                ),
-                child: Text(
-                  photo.album.length > 14
-                      ? '${photo.album.substring(0, 14)}…'
-                      : photo.album,
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: Colors.white, fontSize: 9),
+      child: ClipRRect(
+        borderRadius: AppRadius.borderRadiusMd,
+        child: SizedBox(
+          height: baseHeight,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl:
+                    'https://picsum.photos/seed/photo_${photo.id}/400/${baseHeight.toInt()}',
+                fit: BoxFit.cover,
+                placeholder: (_, __) => Container(color: _seedColor()),
+                errorWidget: (_, __, ___) => Container(
+                  color: _seedColor(),
+                  child: Center(
+                    child: Icon(Icons.image_outlined,
+                        size: 32,
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.black.withValues(alpha: 0.08)),
+                  ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                bottom: 6,
+                left: 6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.black45,
+                    borderRadius: AppRadius.borderRadiusXs,
+                  ),
+                  child: Text(
+                    photo.album.length > 14
+                        ? '${photo.album.substring(0, 14)}…'
+                        : photo.album,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: Colors.white, fontSize: 9),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -385,18 +393,27 @@ class _LightboxViewState extends State<_LightboxView> {
             itemBuilder: (_, i) {
               final p = widget.photos[i];
               return Center(
-                child: Container(
-                  margin: const EdgeInsets.all(AppSpacing.sp6),
-                  decoration: BoxDecoration(
-                    color: _seedColor(p.colorSeed),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.sp6),
+                  child: ClipRRect(
                     borderRadius: AppRadius.borderRadiusMd,
-                  ),
-                  child: AspectRatio(
-                    aspectRatio: p.aspectRatio,
-                    child: Center(
-                      child: Icon(Icons.image_outlined,
-                          size: 64,
-                          color: Colors.white.withValues(alpha: 0.3)),
+                    child: AspectRatio(
+                      aspectRatio: p.aspectRatio,
+                      child: CachedNetworkImage(
+                        imageUrl:
+                            'https://picsum.photos/seed/photo_${p.id}/800/800',
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) =>
+                            Container(color: _seedColor(p.colorSeed)),
+                        errorWidget: (_, __, ___) => Container(
+                          color: _seedColor(p.colorSeed),
+                          child: Center(
+                            child: Icon(Icons.image_outlined,
+                                size: 64,
+                                color: Colors.white.withValues(alpha: 0.3)),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
