@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
@@ -16,17 +18,18 @@ import '../../shared/widgets/widgets.dart';
 // Layout: avatar circle → name input → bio input → "Complete Setup" button
 //         + "Skip for now" ghost link.
 //
-// On completion → marks setup as done in AuthService → navigates to /home.
+// On completion → marks setup as done via API → navigates to /home.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ProfileSetupScreen extends StatefulWidget {
+class ProfileSetupScreen extends ConsumerStatefulWidget {
   const ProfileSetupScreen({super.key});
 
   @override
-  State<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
+  ConsumerState<ProfileSetupScreen> createState() =>
+      _ProfileSetupScreenState();
 }
 
-class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
+class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _displayNameController = TextEditingController();
   final _bioController = TextEditingController();
   bool _isLoading = false;
@@ -42,23 +45,41 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   }
 
   Future<void> _completeSetup() async {
+    final name = _displayNameController.text.trim();
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your display name.')),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
 
-    // TODO: Upload profile data to backend.
-    await Future.delayed(const Duration(seconds: 1));
-    if (!mounted) return;
+    final bio = _bioController.text.trim();
+    final success = await ref.read(authNotifierProvider.notifier).completeSetup(
+          name: name,
+          bio: bio.isNotEmpty ? bio : null,
+        );
 
-    // Persist that setup is complete.
-    await AuthService.instance.completeSetup();
+    if (!mounted) return;
 
     setState(() => _isLoading = false);
-    if (!mounted) return;
 
-    context.go(AppRoutes.home);
+    if (success) {
+      context.go(AppRoutes.home);
+    }
   }
 
   Future<void> _skip() async {
-    await AuthService.instance.completeSetup();
+    // Complete setup with minimal info.
+    final name = _displayNameController.text.trim();
+    if (name.isNotEmpty) {
+      await ref
+          .read(authNotifierProvider.notifier)
+          .completeSetup(name: name);
+    } else {
+      await AuthService.instance.completeSetup();
+    }
     if (!mounted) return;
     context.go(AppRoutes.home);
   }

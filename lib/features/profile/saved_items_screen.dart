@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/user_providers.dart';
+import '../../core/repositories/user_repository.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -7,113 +10,53 @@ import '../../shared/widgets/widgets.dart';
 // SAVED ITEMS SCREEN
 //
 // Unified view of all bookmarks: sermons, events, verses, devotionals —
-// with filter tabs.
+// with filter tabs.  Now wired to userNotifierProvider.fetchSavedItems().
 // ──────────────────────────────────────────────────────────────────────────────
 
-class SavedItemsScreen extends StatefulWidget {
+class SavedItemsScreen extends ConsumerStatefulWidget {
   const SavedItemsScreen({super.key});
 
   @override
-  State<SavedItemsScreen> createState() => _SavedItemsScreenState();
+  ConsumerState<SavedItemsScreen> createState() => _SavedItemsScreenState();
 }
 
-class _SavedItemsScreenState extends State<SavedItemsScreen>
+class _SavedItemsScreenState extends ConsumerState<SavedItemsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabCtrl;
 
   static const _tabs = ['All', 'Sermons', 'Events', 'Verses', 'Devotionals'];
 
-  static final _allItems = <_SavedItem>[
-    _SavedItem(
-      type: 'Sermons',
-      title: 'Walking by Faith, Not by Sight',
-      subtitle: 'Pastor James • Faith Foundations',
-      date: DateTime.now().subtract(const Duration(days: 2)),
-      icon: Icons.headphones_outlined,
-      color: const Color(0xFF2563EB),
-    ),
-    _SavedItem(
-      type: 'Verses',
-      title: 'Jeremiah 29:11',
-      subtitle:
-          '"For I know the plans I have for you," declares the LORD...',
-      date: DateTime.now().subtract(const Duration(days: 3)),
-      icon: Icons.menu_book_outlined,
-      color: const Color(0xFF7C3AED),
-    ),
-    _SavedItem(
-      type: 'Events',
-      title: 'Youth Worship Night',
-      subtitle: 'March 15 • 6:00 PM • Main Auditorium',
-      date: DateTime.now().subtract(const Duration(days: 4)),
-      icon: Icons.event_outlined,
-      color: const Color(0xFFF59E0B),
-    ),
-    _SavedItem(
-      type: 'Devotionals',
-      title: 'Morning Grace — Day 14',
-      subtitle: 'Finding Peace in the Storm',
-      date: DateTime.now().subtract(const Duration(days: 5)),
-      icon: Icons.wb_sunny_outlined,
-      color: const Color(0xFFEC4899),
-    ),
-    _SavedItem(
-      type: 'Sermons',
-      title: 'The Power of Prayer',
-      subtitle: 'Pastor James • Faith Foundations',
-      date: DateTime.now().subtract(const Duration(days: 8)),
-      icon: Icons.headphones_outlined,
-      color: const Color(0xFF2563EB),
-    ),
-    _SavedItem(
-      type: 'Verses',
-      title: 'Psalm 23:1-4',
-      subtitle:
-          'The LORD is my shepherd; I shall not want...',
-      date: DateTime.now().subtract(const Duration(days: 10)),
-      icon: Icons.menu_book_outlined,
-      color: const Color(0xFF7C3AED),
-    ),
-    _SavedItem(
-      type: 'Events',
-      title: 'Easter Service',
-      subtitle: 'April 20 • 9:00 AM • All Campuses',
-      date: DateTime.now().subtract(const Duration(days: 12)),
-      icon: Icons.event_outlined,
-      color: const Color(0xFFF59E0B),
-    ),
-    _SavedItem(
-      type: 'Sermons',
-      title: 'Grace Upon Grace',
-      subtitle: 'Pastor Sarah • Unmerited Favor',
-      date: DateTime.now().subtract(const Duration(days: 15)),
-      icon: Icons.headphones_outlined,
-      color: const Color(0xFF2563EB),
-    ),
-    _SavedItem(
-      type: 'Devotionals',
-      title: 'Evening Reflections — Day 7',
-      subtitle: 'Trusting God in the Waiting',
-      date: DateTime.now().subtract(const Duration(days: 18)),
-      icon: Icons.wb_sunny_outlined,
-      color: const Color(0xFFEC4899),
-    ),
-    _SavedItem(
-      type: 'Verses',
-      title: 'Romans 8:28',
-      subtitle:
-          'And we know that in all things God works for the good...',
-      date: DateTime.now().subtract(const Duration(days: 20)),
-      icon: Icons.menu_book_outlined,
-      color: const Color(0xFF7C3AED),
-    ),
-  ];
+  /// Map entityType from backend to our tab names.
+  static const _typeMap = {
+    'SERMON': 'Sermons',
+    'EVENT': 'Events',
+    'VERSE': 'Verses',
+    'DEVOTIONAL': 'Devotionals',
+    'READING_PLAN': 'Devotionals',
+  };
+
+  static const _typeIcons = <String, IconData>{
+    'Sermons': Icons.headphones_outlined,
+    'Events': Icons.event_outlined,
+    'Verses': Icons.menu_book_outlined,
+    'Devotionals': Icons.wb_sunny_outlined,
+  };
+
+  static const _typeColors = <String, Color>{
+    'Sermons': Color(0xFF2563EB),
+    'Events': Color(0xFFF59E0B),
+    'Verses': Color(0xFF7C3AED),
+    'Devotionals': Color(0xFFEC4899),
+  };
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
     _tabCtrl.addListener(() => setState(() {}));
+    // Load saved items
+    Future.microtask(
+        () => ref.read(userNotifierProvider.notifier).fetchSavedItems());
   }
 
   @override
@@ -122,9 +65,17 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
     super.dispose();
   }
 
-  List<_SavedItem> get _filtered {
-    if (_tabCtrl.index == 0) return _allItems;
-    return _allItems.where((i) => i.type == _tabs[_tabCtrl.index]).toList();
+  String _tabName(SavedItem item) =>
+      _typeMap[item.entityType.toUpperCase()] ?? 'Devotionals';
+
+  List<SavedItem> get _allItems =>
+      ref.read(userNotifierProvider).savedItems;
+
+  List<SavedItem> get _filtered {
+    final all = _allItems;
+    if (_tabCtrl.index == 0) return all;
+    final tabName = _tabs[_tabCtrl.index];
+    return all.where((i) => _tabName(i) == tabName).toList();
   }
 
   static const _monthNames = [
@@ -132,7 +83,10 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
-  String _formatDate(DateTime d) {
+  String _formatDate(String? iso) {
+    if (iso == null) return '';
+    final d = DateTime.tryParse(iso);
+    if (d == null) return '';
     final diff = DateTime.now().difference(d).inDays;
     if (diff == 0) return 'Today';
     if (diff == 1) return 'Yesterday';
@@ -143,6 +97,8 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Watch for state changes
+    final savedItems = ref.watch(userNotifierProvider).savedItems;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -164,8 +120,10 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
               itemBuilder: (context, i) {
                 final sel = _tabCtrl.index == i;
                 final count = i == 0
-                    ? _allItems.length
-                    : _allItems.where((it) => it.type == _tabs[i]).length;
+                    ? savedItems.length
+                    : savedItems
+                        .where((it) => _tabName(it) == _tabs[i])
+                        .length;
 
                 return GestureDetector(
                   onTap: () => _tabCtrl.animateTo(i),
@@ -248,11 +206,24 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                     itemCount: _filtered.length,
                     itemBuilder: (context, i) {
                       final item = _filtered[i];
+                      final typeName = _tabName(item);
+                      final color =
+                          _typeColors[typeName] ?? const Color(0xFF2563EB);
+                      final icon =
+                          _typeIcons[typeName] ?? Icons.bookmark_outlined;
+                      // Try to extract title from entity, fallback to entityType + entityId
+                      final title = item.entity?['title'] as String? ??
+                          '${item.entityType} item';
+                      final subtitle =
+                          item.entity?['description'] as String? ??
+                              item.entity?['subtitle'] as String? ??
+                              '';
+
                       return Padding(
                         padding:
                             const EdgeInsets.only(bottom: AppSpacing.sp3),
                         child: Dismissible(
-                          key: ValueKey(item.title + item.type),
+                          key: ValueKey(item.id),
                           direction: DismissDirection.endToStart,
                           background: Container(
                             alignment: Alignment.centerRight,
@@ -266,16 +237,16 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                                 color: Colors.white),
                           ),
                           onDismissed: (_) {
+                            ref
+                                .read(userNotifierProvider.notifier)
+                                .removeSavedItem(item.id);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content:
-                                    Text('Removed "${item.title}"'),
+                                content: Text('Removed "$title"'),
                                 behavior: SnackBarBehavior.floating,
                                 shape: RoundedRectangleBorder(
                                     borderRadius:
                                         AppRadius.borderRadiusSm),
-                                action: SnackBarAction(
-                                    label: 'Undo', onPressed: () {}),
                               ),
                             );
                           },
@@ -297,13 +268,13 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                                   width: 44,
                                   height: 44,
                                   decoration: BoxDecoration(
-                                    color: item.color
-                                        .withValues(alpha: 0.1),
+                                    color:
+                                        color.withValues(alpha: 0.1),
                                     borderRadius:
                                         AppRadius.borderRadiusMd,
                                   ),
-                                  child: Icon(item.icon,
-                                      color: item.color, size: 22),
+                                  child: Icon(icon,
+                                      color: color, size: 22),
                                 ),
                                 const SizedBox(
                                     width: AppSpacing.sp3),
@@ -312,7 +283,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(item.title,
+                                      Text(title,
                                           style: AppTextStyles
                                               .bodyLargeSemiBold
                                               .copyWith(
@@ -325,7 +296,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                                           overflow:
                                               TextOverflow.ellipsis),
                                       const SizedBox(height: 3),
-                                      Text(item.subtitle,
+                                      Text(subtitle,
                                           style: AppTextStyles.bodySmall
                                               .copyWith(
                                                   color: isDark
@@ -352,20 +323,21 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
                                               horizontal: 6,
                                               vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: item.color
+                                        color: color
                                             .withValues(alpha: 0.1),
                                         borderRadius: AppRadius
                                             .borderRadiusFull,
                                       ),
-                                      child: Text(item.type,
+                                      child: Text(typeName,
                                           style: AppTextStyles
                                               .bodySmall
                                               .copyWith(
-                                                  color: item.color,
+                                                  color: color,
                                                   fontSize: 9)),
                                     ),
                                     const SizedBox(height: 4),
-                                    Text(_formatDate(item.date),
+                                    Text(
+                                        _formatDate(item.createdAt),
                                         style: AppTextStyles.bodySmall
                                             .copyWith(
                                                 color: isDark
@@ -388,24 +360,4 @@ class _SavedItemsScreenState extends State<SavedItemsScreen>
       ),
     );
   }
-}
-
-// ── Data ─────────────────────────────────────────────────────────────────────
-
-class _SavedItem {
-  const _SavedItem({
-    required this.type,
-    required this.title,
-    required this.subtitle,
-    required this.date,
-    required this.icon,
-    required this.color,
-  });
-
-  final String type;
-  final String title;
-  final String subtitle;
-  final DateTime date;
-  final IconData icon;
-  final Color color;
 }

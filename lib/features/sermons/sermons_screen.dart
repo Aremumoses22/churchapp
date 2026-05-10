@@ -211,6 +211,25 @@ class _SermonsScreenState extends ConsumerState<SermonsScreen>
 // SERIES COVER CARD — Netflix-style artwork card
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/// Generate a deterministic color from the series title for the card gradient.
+Color _seriesColor(SermonSeries s) {
+  const palette = [
+    Color(0xFF1E40AF),
+    Color(0xFF7C3AED),
+    Color(0xFFF59E0B),
+    Color(0xFF10B981),
+    Color(0xFFEF4444),
+    Color(0xFF6366F1),
+  ];
+  return palette[s.title.hashCode.abs() % palette.length];
+}
+
+/// Pick a decorative emoji based on title hash (purely visual).
+String _seriesEmoji(SermonSeries s) {
+  const emojis = ['\u{1F525}', '\u{1F54A}\uFE0F', '\u{1F3B5}', '\u{1F331}', '\u{1F46A}', '\u{2728}'];
+  return emojis[s.title.hashCode.abs() % emojis.length];
+}
+
 class _SeriesCoverCard extends StatelessWidget {
   const _SeriesCoverCard({
     required this.series,
@@ -230,10 +249,18 @@ class _SeriesCoverCard extends StatelessWidget {
       child: Container(
         width: 130,
         decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              _seriesColor(series),
+              _seriesColor(series).withValues(alpha: 0.7),
+            ],
+          ),
           borderRadius: AppRadius.borderRadiusLg,
           boxShadow: [
             BoxShadow(
-              color: series.color.withValues(alpha: 0.3),
+              color: _seriesColor(series).withValues(alpha: 0.3),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -254,13 +281,13 @@ class _SeriesCoverCard extends StatelessWidget {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      series.color,
-                      series.color.withValues(alpha: 0.7),
+                      _seriesColor(series),
+                      _seriesColor(series).withValues(alpha: 0.7),
                     ],
                   ),
                 ),
               ),
-              errorWidget: (_, __, ___) => Container(color: series.color),
+              errorWidget: (_, __, ___) => Container(color: _seriesColor(series)),
             ),
             // Gradient overlay
             Container(
@@ -270,7 +297,7 @@ class _SeriesCoverCard extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.black.withValues(alpha: 0.15),
-                    series.color.withValues(alpha: 0.85),
+                    _seriesColor(series).withValues(alpha: 0.85),
                   ],
                 ),
               ),
@@ -281,7 +308,7 @@ class _SeriesCoverCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(series.emoji,
+                  Text(_seriesEmoji(series),
                       style: const TextStyle(fontSize: 32)),
                   const Spacer(),
                   Text(
@@ -293,7 +320,7 @@ class _SeriesCoverCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    series.subtitle,
+                    '${series.sermonCount} sermons',
                     style: AppTextStyles.bodySmall
                         .copyWith(color: Colors.white70, fontSize: 10),
                   ),
@@ -414,7 +441,7 @@ class _SermonCardState extends State<_SermonCard> {
                           borderRadius: AppRadius.borderRadiusXs,
                         ),
                         child: Text(
-                          widget.sermon.series!,
+                          widget.sermon.series!.title,
                           style: AppTextStyles.labelSmall
                               .copyWith(color: AppColors.gold),
                         ),
@@ -457,7 +484,7 @@ class _SermonCardState extends State<_SermonCard> {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          widget.sermon.duration,
+                          widget.sermon.durationFormatted,
                           style: AppTextStyles.bodySmall.copyWith(
                             color: widget.isDark
                                 ? AppColors.textSecondaryDark

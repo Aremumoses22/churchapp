@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/user_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../core/services/services.dart';
 import '../../shared/widgets/widgets.dart';
@@ -11,15 +13,34 @@ import '../../shared/widgets/widgets.dart';
 //
 // Avatar with gold border, name/dept/church, stats row, menu sections (My
 // Activity, Account, Support), logout with confirmation bottom sheet.
+// Now wired to userNotifierProvider for real profile data.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ProfileScreen extends StatelessWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
+
+  @override
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Fetch profile if not already loaded
+    Future.microtask(() {
+      final state = ref.read(userNotifierProvider);
+      if (state.profile == null && !state.isLoading) {
+        ref.read(userNotifierProvider.notifier).fetchProfile();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final auth = AuthService.instance;
+    final userState = ref.watch(userNotifierProvider);
+    final profile = userState.profile;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -52,16 +73,22 @@ class ProfileScreen extends StatelessWidget {
                     radius: 50,
                     backgroundColor:
                         isDark ? AppColors.primaryLight : AppColors.skyLight,
-                    child: Text(
-                      (auth.userName != null && auth.userName!.isNotEmpty
-                          ? auth.userName![0]
-                          : 'U').toUpperCase(),
-                      style: AppTextStyles.displayLarge.copyWith(
-                        color: isDark
-                            ? AppColors.textInverse
-                            : AppColors.primary,
-                      ),
-                    ),
+                    backgroundImage: profile?.avatarUrl != null
+                        ? NetworkImage(profile!.avatarUrl!)
+                        : null,
+                    child: profile?.avatarUrl == null
+                        ? Text(
+                            (profile?.name.isNotEmpty == true
+                                ? profile!.name[0]
+                                : 'U')
+                                .toUpperCase(),
+                            style: AppTextStyles.displayLarge.copyWith(
+                              color: isDark
+                                  ? AppColors.textInverse
+                                  : AppColors.primary,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
                 Container(
@@ -84,9 +111,7 @@ class ProfileScreen extends StatelessWidget {
 
             // ── Name ───────────────────────────────────────────────────
             Text(
-              (auth.userName != null && auth.userName!.isNotEmpty)
-                  ? auth.userName!
-                  : 'User',
+              profile?.name ?? 'User',
               style: AppTextStyles.headingLarge.copyWith(
                 color:
                     isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
@@ -103,7 +128,7 @@ class ProfileScreen extends StatelessWidget {
                 borderRadius: AppRadius.borderRadiusFull,
               ),
               child: Text(
-                'Media Department',
+                profile?.department ?? 'Member',
                 style: AppTextStyles.bodyMedium.copyWith(
                   color: isDark
                       ? AppColors.textSecondaryDark
@@ -113,7 +138,9 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.sp1),
             Text(
-              'Grace Community Church',
+              profile?.joinedDate != null
+                  ? 'Joined ${profile!.joinedDate}'
+                  : '',
               style: AppTextStyles.bodySmall.copyWith(color: AppColors.gold),
             ),
 
@@ -124,21 +151,21 @@ class ProfileScreen extends StatelessWidget {
               child: IntrinsicHeight(
                 child: Row(
                   children: [
-                    _stat('24', 'Sermons', isDark),
+                    _stat('–', 'Sermons', isDark),
                     VerticalDivider(
                       color: isDark
                           ? AppColors.borderDark
                           : const Color(0xFFF3F4F6),
                       width: 1,
                     ),
-                    _stat('\u20A648K', 'Given (2026)', isDark),
+                    _stat('–', 'Given', isDark),
                     VerticalDivider(
                       color: isDark
                           ? AppColors.borderDark
                           : const Color(0xFFF3F4F6),
                       width: 1,
                     ),
-                    _stat('8', 'Events', isDark),
+                    _stat('–', 'Events', isDark),
                   ],
                 ),
               ),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -15,14 +17,14 @@ import '../../shared/widgets/widgets.dart';
 // Auto-focus next box on digit entry. Validation + success animation.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ChurchCodeScreen extends StatefulWidget {
+class ChurchCodeScreen extends ConsumerStatefulWidget {
   const ChurchCodeScreen({super.key});
 
   @override
-  State<ChurchCodeScreen> createState() => _ChurchCodeScreenState();
+  ConsumerState<ChurchCodeScreen> createState() => _ChurchCodeScreenState();
 }
 
-class _ChurchCodeScreenState extends State<ChurchCodeScreen> {
+class _ChurchCodeScreenState extends ConsumerState<ChurchCodeScreen> {
   final List<TextEditingController> _controllers =
       List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
@@ -45,20 +47,28 @@ class _ChurchCodeScreenState extends State<ChurchCodeScreen> {
       _errorMessage = null;
     });
 
-    // TODO: Validate code against backend.
-    await Future.delayed(const Duration(seconds: 2));
+    final success =
+        await ref.read(authNotifierProvider.notifier).verifyChurchCode(code);
+
     if (!mounted) return;
 
-    // Simulate success.
-    setState(() {
-      _isLoading = false;
-      _isSuccess = true;
-    });
+    if (success) {
+      setState(() {
+        _isLoading = false;
+        _isSuccess = true;
+      });
 
-    // Brief success pause, then navigate to profile setup.
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (!mounted) return;
-    context.go(AppRoutes.profileSetup);
+      // Brief success pause, then navigate to profile setup.
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      context.go(AppRoutes.profileSetup);
+    } else {
+      final authState = ref.read(authNotifierProvider);
+      setState(() {
+        _isLoading = false;
+        _errorMessage = authState.error ?? 'Invalid church code.';
+      });
+    }
   }
 
   void _onDigitChanged(int index, String value) {

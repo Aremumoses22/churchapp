@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/user_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -8,17 +10,19 @@ import '../../shared/widgets/widgets.dart';
 //
 // Granular toggles per category: Sermons, Events, Giving Receipts, Prayer
 // Updates, Announcements, Live Alerts — each with push + email toggles.
+// Now syncs with userNotifierProvider.updateNotificationPrefs().
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ManageNotificationsScreen extends StatefulWidget {
+class ManageNotificationsScreen extends ConsumerStatefulWidget {
   const ManageNotificationsScreen({super.key});
 
   @override
-  State<ManageNotificationsScreen> createState() =>
+  ConsumerState<ManageNotificationsScreen> createState() =>
       _ManageNotificationsScreenState();
 }
 
-class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
+class _ManageNotificationsScreenState
+    extends ConsumerState<ManageNotificationsScreen> {
   bool _globalPush = true;
   bool _globalEmail = true;
 
@@ -64,6 +68,18 @@ class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
         }
       }
     });
+    _syncPrefs();
+  }
+
+  /// Persist current toggle state to the backend.
+  void _syncPrefs() {
+    final flat = <String, bool>{};
+    for (final entry in _prefs.entries) {
+      final key = entry.key.replaceAll(' ', '_').toLowerCase();
+      flat['${key}_push'] = entry.value[0];
+      flat['${key}_email'] = entry.value[1];
+    }
+    ref.read(userNotifierProvider.notifier).updateNotificationPrefs(flat);
   }
 
   @override
@@ -206,6 +222,7 @@ class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
                                 if (!v && _globalPush) {
                                   setState(() => _globalPush = false);
                                 }
+                                _syncPrefs();
                               },
                             ),
                           ),
@@ -221,6 +238,7 @@ class _ManageNotificationsScreenState extends State<ManageNotificationsScreen> {
                                 if (!v && _globalEmail) {
                                   setState(() => _globalEmail = false);
                                 }
+                                _syncPrefs();
                               },
                             ),
                           ),

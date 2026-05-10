@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
-import '../../core/services/auth_service.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -10,56 +11,59 @@ import '../../shared/widgets/widgets.dart';
 // REGISTER SCREEN
 //
 // Mirrors login layout but with name fields and confirm-password.
-// On success → navigates to church-code screen.
+// On success → navigates to email verification screen.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
 
   @override
-  State<RegisterScreen> createState() => _RegisterScreenState();
+  ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _RegisterScreenState extends State<RegisterScreen> {
+class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
-  bool _isLoading = false;
-  String? _errorMessage;
-
   Future<void> _register() async {
     // Basic client-side validation.
     if (_passwordController.text != _confirmPasswordController.text) {
-      setState(() => _errorMessage = 'Passwords do not match.');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Passwords do not match.')),
+      );
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    // TODO: Replace with real registration logic.
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
-    // Mark the user as logged in (pending setup).
-    final email = _emailController.text.trim();
     final name = _nameController.text.trim();
-    await AuthService.instance.login(email: email, name: name);
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-    setState(() => _isLoading = false);
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in all fields.')),
+      );
+      return;
+    }
 
-    // Navigate to email verification with the user's email.
+    final success = await ref.read(authNotifierProvider.notifier).register(
+          name: name,
+          email: email,
+          password: password,
+        );
+
     if (!mounted) return;
-    context.go(
-      Uri(
-        path: AppRoutes.emailVerification,
-        queryParameters: {'email': email},
-      ).toString(),
-    );
+
+    if (success) {
+      // Navigate to email verification with the user's email.
+      context.go(
+        Uri(
+          path: AppRoutes.emailVerification,
+          queryParameters: {'email': email},
+        ).toString(),
+      );
+    }
   }
 
   @override
@@ -74,6 +78,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState.isLoading;
+    final errorMessage = authState.error;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -119,7 +126,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: AppSpacing.sp6),
 
                 // Error banner
-                if (_errorMessage != null) ...[
+                if (errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.sp3),
                     decoration: BoxDecoration(
@@ -133,7 +140,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const SizedBox(width: AppSpacing.sp2),
                         Expanded(
                           child: Text(
-                            _errorMessage!,
+                            errorMessage,
                             style: AppTextStyles.bodySmall
                                 .copyWith(color: AppColors.error),
                           ),
@@ -189,8 +196,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Register button
                 AppPrimaryButton(
                   label: 'Create Account',
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _register,
+                  isLoading: isLoading,
+                  onPressed: isLoading ? null : _register,
                 ),
                 const SizedBox(height: AppSpacing.sp6),
 

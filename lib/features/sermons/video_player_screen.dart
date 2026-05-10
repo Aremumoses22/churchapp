@@ -1,8 +1,9 @@
-import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:video_player/video_player.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/sermon.dart';
+import '../../core/providers/sermon_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -13,7 +14,7 @@ import '../../shared/widgets/widgets.dart';
 // picture-in-picture support, Chromecast button.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class VideoPlayerScreen extends StatefulWidget {
+class VideoPlayerScreen extends ConsumerStatefulWidget {
   const VideoPlayerScreen({
     super.key,
     this.sermonId,
@@ -26,64 +27,79 @@ class VideoPlayerScreen extends StatefulWidget {
   final String? sermonSpeaker;
 
   @override
-  State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+  ConsumerState<VideoPlayerScreen> createState() =>
+      _VideoPlayerScreenState();
 }
 
-class _VideoPlayerScreenState extends State<VideoPlayerScreen>
+class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     with SingleTickerProviderStateMixin {
-  // ── Online demo video – replace with your sermon CDN URL ──────────────────
-  static const _videoUrl =
-      'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4';
-
-  late VideoPlayerController _videoController;
-  ChewieController? _chewieController;
+  bool _isPlaying = false;
+  bool _controlsVisible = true;
+  bool _isFullscreen = false;
+  double _progress = 0.0;
   String _selectedQuality = '1080p';
+  late AnimationController _controlsFadeController;
+  late Animation<double> _controlsFade;
+
+  // Resolved from API
+  String _title = '';
+  String _speaker = '';
+  int _totalSeconds = 0;
+  String _dateViews = '';
+
   static const _qualities = ['Auto', '1080p', '720p', '480p', '360p'];
 
   @override
   void initState() {
     super.initState();
-    _initPlayer();
+    _controlsFadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+      value: 1.0,
+    );
+    _controlsFade = CurvedAnimation(
+      parent: _controlsFadeController,
+      curve: Curves.easeOut,
+    );
+    _title = widget.sermonTitle ?? '';
+    _speaker = widget.sermonSpeaker ?? '';
+    _loadSermonDetails();
   }
 
-  Future<void> _initPlayer() async {
-    _videoController =
-        VideoPlayerController.networkUrl(Uri.parse(_videoUrl));
-    await _videoController.initialize();
-    _chewieController = ChewieController(
-      videoPlayerController: _videoController,
-      autoPlay: false,
-      looping: false,
-      allowFullScreen: true,
-      allowMuting: true,
-      showOptions: false,
-      materialProgressColors: ChewieProgressColors(
-        playedColor: AppColors.gold,
-        handleColor: AppColors.gold,
-        backgroundColor: Colors.white24,
-        bufferedColor: Colors.white38,
-      ),
-      placeholder: Container(color: Colors.black),
-      errorBuilder: (context, errorMessage) => Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.white, size: 48),
-            const SizedBox(height: 8),
-            Text(errorMessage,
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-    if (mounted) setState(() {});
+  Future<void> _loadSermonDetails() async {
+    if (widget.sermonId == null) return;
+    try {
+      final repo = ref.read(sermonRepositoryProvider);
+      final res = await repo.getSermon(widget.sermonId!);
+      if (res.success && res.data != null && mounted) {
+        final s = res.data!;
+        setState(() {
+          _title = s.title;
+          _speaker = s.speaker ?? _speaker;
+          _totalSeconds = s.duration ?? 0;
+          _dateViews =
+              '${s.dateFormatted} · ${s.playCount ?? 0} plays';
+        });
+        // Load related sermons (featured list excluding current)
+        try {
+          final featRes = await repo.getFeatured();
+          if (featRes.success && featRes.data != null && mounted) {
+            setState(() {
+              _relatedSermons = featRes.data!
+                  .where((r) => r.id != widget.sermonId)
+                  .take(5)
+                  .toList();
+            });
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _chewieController?.dispose();
-    _videoController.dispose();
+    _controlsFadeController.dispose();
+    // Restore portrait orientation
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
@@ -92,6 +108,62 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     super.dispose();
   }
 
+  void _togglePlayPause() {
+    HapticFeedback.lightImpact();
+    setState(() => _isPlaying = !_isPlaying);
+    // Auto-hide controls after 3 seconds while playing
+    if (_isPlaying) {
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && _isPlaying) {
+          _controlsFadeController.reverse();
+          setState(() => _controlsVisible = false);
+        }
+      });
+    }
+  }
+
+  void _toggleControls() {
+    setState(() {
+      _controlsVisible = !_controlsVisible;
+      if (_controlsVisible) {
+        _controlsFadeController.forward();
+        // Auto-hide after 3s if playing
+        if (_isPlaying) {
+          Future.delayed(const Duration(seconds: 3), () {
+            if (mounted && _isPlaying && _controlsVisible) {
+              _controlsFadeController.reverse();
+              setState(() => _controlsVisible = false);
+            }
+          });
+        }
+      } else {
+        _controlsFadeController.reverse();
+      }
+    });
+  }
+
+  void _toggleFullscreen() {
+    setState(() => _isFullscreen = !_isFullscreen);
+    if (_isFullscreen) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.portraitDown,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+  }
+
+  String _formatDuration(Duration d) {
+    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -102,240 +174,589 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       body: Column(
         children: [
           // ── Video Player Area ────────────────────────────────────────────
-          AspectRatio(
-            aspectRatio: 16 / 9,
-            child: _chewieController != null
-                ? Chewie(controller: _chewieController!)
-                : Container(
-                    color: Colors.black,
-                    child: const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.gold,
-                      ),
-                    ),
+          Expanded(
+            flex: _isFullscreen ? 1 : 0,
+            child: _isFullscreen
+                ? _buildVideoArea(isDark)
+                : AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: _buildVideoArea(isDark),
                   ),
           ),
 
-          // ── Info & Related Content ───────────────────────────────────────
-          Expanded(
-            child: Container(
-              color: isDark ? AppColors.bgDark : AppColors.warmWhite,
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ── Sermon Info ──────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.all(
-                        AppSpacing.screenHorizontalPadding,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: AppSpacing.sp2),
-                          Text(
-                            widget.sermonTitle ?? 'Walking in Faith',
-                            style: AppTextStyles.headingMedium.copyWith(
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimary,
+          // ── Info & Related Content (portrait only) ───────────────────────
+          if (!_isFullscreen)
+            Expanded(
+              child: Container(
+                color: isDark ? AppColors.bgDark : AppColors.warmWhite,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Sermon Info ──────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.all(
+                          AppSpacing.screenHorizontalPadding,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: AppSpacing.sp2),
+                            Text(
+                              _title.isNotEmpty ? _title : 'Sermon',
+                              style:
+                                  AppTextStyles.headingMedium.copyWith(
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: AppSpacing.sp2),
-                          Row(
-                            children: [
-                              // Speaker avatar
-                              Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isDark
-                                      ? AppColors.primaryLight
-                                      : AppColors.primary,
-                                ),
-                                child: const Center(
-                                  child: Text(
-                                    'D',
-                                    style: TextStyle(
-                                      color: AppColors.textInverse,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
+                            const SizedBox(height: AppSpacing.sp2),
+                            Row(
+                              children: [
+                                // Speaker avatar
+                                Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isDark
+                                        ? AppColors.primaryLight
+                                        : AppColors.primary,
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      '',
+                                      style: TextStyle(
+                                        color: AppColors.textInverse,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: AppSpacing.sp2),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      widget.sermonSpeaker ??
-                                          'Pastor David Mitchell',
-                                      style: AppTextStyles.labelMedium
-                                          .copyWith(
-                                        color: isDark
-                                            ? AppColors.textPrimaryDark
-                                            : AppColors.textPrimary,
+                                const SizedBox(width: AppSpacing.sp2),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _speaker.isNotEmpty
+                                            ? _speaker
+                                            : 'Unknown Speaker',
+                                        style: AppTextStyles.labelMedium
+                                            .copyWith(
+                                          color: isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimary,
+                                        ),
                                       ),
-                                    ),
-                                    Text(
-                                      'Jan 12, 2025 · 1.2K views',
-                                      style: AppTextStyles.bodySmall
-                                          .copyWith(
-                                        color: isDark
-                                            ? AppColors.textSecondaryDark
-                                            : AppColors.textSecondary,
+                                      Text(
+                                        _dateViews.isNotEmpty
+                                            ? _dateViews
+                                            : '',
+                                        style: AppTextStyles.bodySmall
+                                            .copyWith(
+                                          color: isDark
+                                              ? AppColors
+                                                  .textSecondaryDark
+                                              : AppColors.textSecondary,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // ── Action Row ──────────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.screenHorizontalPadding,
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _VideoAction(                                icon: Icons.hd_outlined,
-                                label: _selectedQuality,
-                                isDark: isDark,
-                                onTap: _showQualitySelector,
-                              ),
-                              const SizedBox(width: AppSpacing.sp4),
-                              _VideoAction(                              icon: Icons.bookmark_outline,
-                              label: 'Save',
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: AppSpacing.sp4),
-                            _VideoAction(
-                              icon: Icons.edit_note_outlined,
-                              label: 'Notes',
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: AppSpacing.sp4),
-                            _VideoAction(
-                              icon: Icons.share_outlined,
-                              label: 'Share',
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: AppSpacing.sp4),
-                            _VideoAction(
-                              icon: Icons.download_outlined,
-                              label: 'Download',
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: AppSpacing.sp4),
-                            _VideoAction(
-                              icon: Icons.headphones_outlined,
-                              label: 'Audio Only',
-                              isDark: isDark,
+                              ],
                             ),
                           ],
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: AppSpacing.sp4),
-
-                    // Divider
-                    Container(
-                      height: 8,
-                      color: isDark
-                          ? AppColors.cardDark
-                          : AppColors.inputFill,
-                    ),
-
-                    // ── Related Sermons ──────────────────────────────────
-                    Padding(
-                      padding: const EdgeInsets.all(
-                        AppSpacing.screenHorizontalPadding,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Up Next',
-                            style: AppTextStyles.headingSmall.copyWith(
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimary,
-                            ),
+                      // ── Action Row ──────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenHorizontalPadding,
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _VideoAction(
+                                icon: Icons.bookmark_outline,
+                                label: 'Save',
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: AppSpacing.sp4),
+                              _VideoAction(
+                                icon: Icons.edit_note_outlined,
+                                label: 'Notes',
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: AppSpacing.sp4),
+                              _VideoAction(
+                                icon: Icons.share_outlined,
+                                label: 'Share',
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: AppSpacing.sp4),
+                              _VideoAction(
+                                icon: Icons.download_outlined,
+                                label: 'Download',
+                                isDark: isDark,
+                              ),
+                              const SizedBox(width: AppSpacing.sp4),
+                              _VideoAction(
+                                icon: Icons.headphones_outlined,
+                                label: 'Audio Only',
+                                isDark: isDark,
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpacing.sp3),
-                          ..._relatedSermons.map(
-                            (s) => _RelatedSermonTile(
-                              sermon: s,
-                              isDark: isDark,
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.sp4),
+
+                      // Divider
+                      Container(
+                        height: 8,
+                        color: isDark
+                            ? AppColors.cardDark
+                            : AppColors.inputFill,
+                      ),
+
+                      // ── Related Sermons ──────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.all(
+                          AppSpacing.screenHorizontalPadding,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Up Next',
+                              style:
+                                  AppTextStyles.headingSmall.copyWith(
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary,
+                              ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: AppSpacing.sp3),
+                            ..._relatedSermons.map(
+                              (s) => _SermonTile(
+                                sermon: s,
+                                isDark: isDark,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: AppSpacing.sp12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoArea(bool isDark) {
+    return GestureDetector(
+      onTap: _toggleControls,
+      child: Container(
+        color: Colors.black,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Video placeholder with gradient
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0xFF1A1A2E),
+                    Color(0xFF16213E),
+                    Color(0xFF0F3460),
+                  ],
+                ),
+              ),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.play_circle_outline,
+                      size: 64,
+                      color: Colors.white.withValues(alpha: 0.3),
+                    ),
+                    const SizedBox(height: AppSpacing.sp2),
+                    Text(
+                      'Video Player',
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        color: Colors.white.withValues(alpha: 0.3),
                       ),
                     ),
-
-                    const SizedBox(height: AppSpacing.sp12),
                   ],
                 ),
               ),
             ),
-          ),
-        ],
+
+            // Controls overlay
+            FadeTransition(
+              opacity: _controlsFade,
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.7),
+                      Colors.transparent,
+                      Colors.transparent,
+                      Colors.black.withValues(alpha: 0.8),
+                    ],
+                    stops: const [0.0, 0.3, 0.7, 1.0],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Top controls
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sp4,
+                          vertical: AppSpacing.sp2,
+                        ),
+                        child: Row(
+                          mainAxisAlignment:
+                              MainAxisAlignment.spaceBetween,
+                          children: [
+                            if (!_isFullscreen)
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: () =>
+                                    Navigator.of(context).pop(),
+                              )
+                            else
+                              const SizedBox(width: 48),
+                            Row(
+                              children: [
+                                // Chromecast button
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.cast,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                  onPressed: () {
+                                    _showCastDialog();
+                                  },
+                                  tooltip: 'Cast',
+                                ),
+                                // PiP button
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons
+                                        .picture_in_picture_alt_outlined,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                  onPressed: () {
+                                    // TODO: enter PiP mode
+                                  },
+                                  tooltip: 'Picture in Picture',
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Center play/pause
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Rewind
+                          IconButton(
+                            icon: const Icon(
+                              Icons.replay_10,
+                              color: Colors.white,
+                              size: 36,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _progress = (_progress -
+                                        (_totalSeconds > 0
+                                            ? 10 / _totalSeconds
+                                            : 0.0))
+                                    .clamp(0.0, 1.0);
+                              });
+                            },
+                          ),
+                          const SizedBox(width: AppSpacing.sp8),
+                          // Play / Pause
+                          GestureDetector(
+                            onTap: _togglePlayPause,
+                            child: Container(
+                              width: 64,
+                              height: 64,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white
+                                    .withValues(alpha: 0.2),
+                              ),
+                              child: Icon(
+                                _isPlaying
+                                    ? Icons.pause
+                                    : Icons.play_arrow,
+                                color: Colors.white,
+                                size: 36,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.sp8),
+                          // Forward
+                          IconButton(
+                            icon: const Icon(
+                              Icons.forward_30,
+                              color: Colors.white,
+                              size: 36,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _progress = (_progress +
+                                        (_totalSeconds > 0
+                                            ? 30 / _totalSeconds
+                                            : 0.0))
+                                    .clamp(0.0, 1.0);
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+
+                      // Bottom controls (scrubber + info)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sp4,
+                        ),
+                        child: Column(
+                          children: [
+                            // Scrubber
+                            SliderTheme(
+                              data: SliderThemeData(
+                                trackHeight: 3,
+                                thumbShape:
+                                    const RoundSliderThumbShape(
+                                  enabledThumbRadius: 6,
+                                ),
+                                overlayShape:
+                                    const RoundSliderOverlayShape(
+                                  overlayRadius: 14,
+                                ),
+                                activeTrackColor: AppColors.gold,
+                                inactiveTrackColor:
+                                    Colors.white.withValues(alpha: 0.3),
+                                thumbColor: AppColors.gold,
+                              ),
+                              child: Slider(
+                                value: _progress,
+                                onChanged: (val) {
+                                  setState(() => _progress = val);
+                                },
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.sp2,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _formatDuration(
+                                        Duration(
+                                            seconds:
+                                                (_totalSeconds *
+                                                        _progress)
+                                                    .round())),
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  Row(
+                                    children: [
+                                      // Quality selector
+                                      GestureDetector(
+                                        onTap: _showQualitySelector,
+                                        child: Container(
+                                          padding:
+                                              const EdgeInsets
+                                                  .symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Colors.white54,
+                                              width: 1,
+                                            ),
+                                            borderRadius:
+                                                BorderRadius
+                                                    .circular(4),
+                                          ),
+                                          child: Text(
+                                            _selectedQuality,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight:
+                                                  FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sp3),
+                                      // Fullscreen toggle
+                                      GestureDetector(
+                                        onTap: _toggleFullscreen,
+                                        child: Icon(
+                                          _isFullscreen
+                                              ? Icons
+                                                  .fullscreen_exit
+                                              : Icons.fullscreen,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    _formatDuration(
+                                        Duration(
+                                            seconds:
+                                                _totalSeconds)),
+                                    style: AppTextStyles.bodySmall
+                                        .copyWith(
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSpacing.sp2),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   void _showQualitySelector() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: isDark ? AppColors.cardDark : AppColors.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       builder: (ctx) => Padding(
         padding: EdgeInsets.only(
-          left: AppSpacing.sp4,
-          right: AppSpacing.sp4,
-          top: AppSpacing.sp4,
-          bottom: AppSpacing.sp4 + MediaQuery.of(ctx).padding.bottom,
+          left: AppSpacing.sp6,
+          right: AppSpacing.sp6,
+          top: AppSpacing.sp6,
+          bottom: AppSpacing.sp6 + MediaQuery.of(ctx).padding.bottom,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : AppColors.inactive,
+                borderRadius: AppRadius.borderRadiusFull,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sp5),
             Text(
               'Video Quality',
               style: AppTextStyles.headingSmall.copyWith(
-                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: AppSpacing.sp3),
-            ..._qualities.map((q) => ListTile(
-                  title: Text(q,
-                      style: TextStyle(
-                        color: _selectedQuality == q
-                            ? (isDark ? AppColors.primaryLight : AppColors.primary)
-                            : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-                        fontWeight: _selectedQuality == q ? FontWeight.w600 : FontWeight.w400,
-                      )),
-                  trailing: _selectedQuality == q
-                      ? Icon(Icons.check,
-                          color: isDark ? AppColors.primaryLight : AppColors.primary)
-                      : null,
+            const SizedBox(height: AppSpacing.sp4),
+            ..._qualities.map((q) => AppTapAnimation(
                   onTap: () {
                     setState(() => _selectedQuality = q);
                     Navigator.pop(ctx);
                   },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: AppSpacing.sp3,
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          q,
+                          style: AppTextStyles.bodyLarge.copyWith(
+                            color: _selectedQuality == q
+                                ? (isDark
+                                    ? AppColors.primaryLight
+                                    : AppColors.primary)
+                                : (isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary),
+                            fontWeight: _selectedQuality == q
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                          ),
+                        ),
+                        if (q == 'Auto')
+                          Text(
+                            '  (Recommended)',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary,
+                            ),
+                          ),
+                        const Spacer(),
+                        if (_selectedQuality == q)
+                          Icon(
+                            Icons.check,
+                            size: 20,
+                            color: isDark
+                                ? AppColors.primaryLight
+                                : AppColors.primary,
+                          ),
+                      ],
+                    ),
+                  ),
                 )),
           ],
         ),
@@ -343,45 +764,88 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
   }
 
-  // Related sermons data
-  static const _relatedSermons = [
-    _RelatedSermon(
-      title: 'The Power of Prayer',
-      speaker: 'Pastor Sarah Chen',
-      duration: '38 min',
-      views: '892 views',
-    ),
-    _RelatedSermon(
-      title: 'Grace Upon Grace',
-      speaker: 'Pastor David Mitchell',
-      duration: '45 min',
-      views: '1.4K views',
-    ),
-    _RelatedSermon(
-      title: 'Finding Purpose',
-      speaker: 'Rev. James Williams',
-      duration: '36 min',
-      views: '756 views',
-    ),
-  ];
-}
+  void _showCastDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-// ──────────────────────────────────────────────────────────────────────────────
-// DATA MODELS
-// ──────────────────────────────────────────────────────────────────────────────
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: isDark ? AppColors.cardDark : AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: AppSpacing.sp6,
+          right: AppSpacing.sp6,
+          top: AppSpacing.sp6,
+          bottom: AppSpacing.sp6 + MediaQuery.of(ctx).padding.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white24 : AppColors.inactive,
+                borderRadius: AppRadius.borderRadiusFull,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sp5),
+            Text(
+              'Cast to Device',
+              style: AppTextStyles.headingSmall.copyWith(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sp5),
+            // Searching indicator
+            Column(
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sp4),
+                Text(
+                  'Searching for devices...',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sp2),
+                Text(
+                  'Make sure your device is on the same Wi-Fi network',
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textDisabled,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sp6),
+          ],
+        ),
+      ),
+    );
+  }
 
-class _RelatedSermon {
-  const _RelatedSermon({
-    required this.title,
-    required this.speaker,
-    required this.duration,
-    required this.views,
-  });
-
-  final String title;
-  final String speaker;
-  final String duration;
-  final String views;
+  List<Sermon> _relatedSermons = [];
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -393,18 +857,18 @@ class _VideoAction extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.isDark,
-    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool isDark;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return AppTapAnimation(
-      onTap: onTap ?? () {},
+      onTap: () {
+        // TODO: action handler
+      },
       child: Column(
         children: [
           Icon(
@@ -429,13 +893,13 @@ class _VideoAction extends StatelessWidget {
   }
 }
 
-class _RelatedSermonTile extends StatelessWidget {
-  const _RelatedSermonTile({
+class _SermonTile extends StatelessWidget {
+  const _SermonTile({
     required this.sermon,
     required this.isDark,
   });
 
-  final _RelatedSermon sermon;
+  final Sermon sermon;
   final bool isDark;
 
   @override
@@ -444,7 +908,16 @@ class _RelatedSermonTile extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
       child: AppTapAnimation(
         onTap: () {
-          // TODO: play related sermon
+          // Navigate to this sermon's video
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => VideoPlayerScreen(
+                sermonId: sermon.id,
+                sermonTitle: sermon.title,
+                sermonSpeaker: sermon.speaker,
+              ),
+            ),
+          );
         },
         child: Row(
           children: [
@@ -453,12 +926,20 @@ class _RelatedSermonTile extends StatelessWidget {
               width: 120,
               height: 68,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [
-                    Color(0xFF1A1A2E),
-                    Color(0xFF0F3460),
-                  ],
-                ),
+                image: sermon.thumbnailUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(sermon.thumbnailUrl!),
+                        fit: BoxFit.cover,
+                      )
+                    : null,
+                gradient: sermon.thumbnailUrl == null
+                    ? const LinearGradient(
+                        colors: [
+                          Color(0xFF1A1A2E),
+                          Color(0xFF0F3460),
+                        ],
+                      )
+                    : null,
                 borderRadius: AppRadius.borderRadiusSm,
               ),
               child: Stack(
@@ -483,7 +964,7 @@ class _RelatedSermonTile extends StatelessWidget {
                         borderRadius: BorderRadius.circular(2),
                       ),
                       child: Text(
-                        sermon.duration,
+                        sermon.durationFormatted,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 10,
@@ -513,7 +994,7 @@ class _RelatedSermonTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    sermon.speaker,
+                    sermon.speaker ?? 'Unknown',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -521,7 +1002,7 @@ class _RelatedSermonTile extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    sermon.views,
+                    '${sermon.playCount ?? 0} plays',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark

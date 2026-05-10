@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/auth_providers.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
@@ -20,44 +22,43 @@ import '../../shared/widgets/widgets.dart';
 // States: Loading (spinner in button), Error (red banner), Success (navigate).
 // ──────────────────────────────────────────────────────────────────────────────
 
-class LoginScreen extends StatefulWidget {
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  bool _isLoading = false;
-  String? _errorMessage;
-
   Future<void> _signIn() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    // TODO: Replace with real auth logic.
-    await Future.delayed(const Duration(seconds: 2));
-    if (!mounted) return;
-
-    // Mark user as logged in.
     final email = _emailController.text.trim();
-    await AuthService.instance.login(email: email);
+    final password = _passwordController.text;
 
-    setState(() => _isLoading = false);
+    if (email.isEmpty || password.isEmpty) {
+      ref.read(authNotifierProvider.notifier).clearError();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter email and password.')),
+      );
+      return;
+    }
+
+    final success = await ref.read(authNotifierProvider.notifier).login(
+          email: email,
+          password: password,
+        );
 
     if (!mounted) return;
 
-    // Route based on setup completion:
-    //   First-time login → church code, returning user → home.
-    if (AuthService.instance.hasCompletedSetup) {
-      context.go(AppRoutes.home);
-    } else {
-      context.go(AppRoutes.churchCode);
+    if (success) {
+      // Route based on setup completion.
+      if (AuthService.instance.hasCompletedSetup) {
+        context.go(AppRoutes.home);
+      } else {
+        context.go(AppRoutes.churchCode);
+      }
     }
   }
 
@@ -71,6 +72,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final authState = ref.watch(authNotifierProvider);
+    final isLoading = authState.isLoading;
+    final errorMessage = authState.error;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -118,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: AppSpacing.sp6),
 
                 // ── Error banner ──────────────────────────────────────────
-                if (_errorMessage != null) ...[
+                if (errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(AppSpacing.sp3),
                     decoration: BoxDecoration(
@@ -132,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(width: AppSpacing.sp2),
                         Expanded(
                           child: Text(
-                            _errorMessage!,
+                            errorMessage,
                             style: AppTextStyles.bodySmall
                                 .copyWith(color: AppColors.error),
                           ),
@@ -178,8 +182,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 // 7 ── Sign In button
                 AppPrimaryButton(
                   label: 'Sign In',
-                  isLoading: _isLoading,
-                  onPressed: _isLoading ? null : _signIn,
+                  isLoading: isLoading,
+                  onPressed: isLoading ? null : _signIn,
                 ),
                 const SizedBox(height: AppSpacing.sp6),
 

@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -358,13 +357,13 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: event.imageColor,
+                  color: _eventCategoryColor(event),
                   shape: BoxShape.circle,
                   border: Border.all(
                       color: Colors.white, width: 2),
                   boxShadow: [
                     BoxShadow(
-                      color: event.imageColor
+                      color: _eventCategoryColor(event)
                           .withValues(alpha: 0.4),
                       blurRadius: 8,
                       offset: const Offset(0, 2),
@@ -420,7 +419,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                 Icon(Icons.calendar_today,
                     size: 14, color: AppColors.gold),
                 const SizedBox(width: 6),
-                Text(event.date,
+                Text(event.dateFormatted,
                     style: AppTextStyles.bodySmall.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -436,7 +435,7 @@ class _EventsScreenState extends ConsumerState<EventsScreen> {
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondary),
                 const SizedBox(width: 6),
-                Text(event.location,
+                Text(event.location ?? '',
                     style: AppTextStyles.bodySmall.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -805,6 +804,27 @@ class _MapGridPainter extends CustomPainter {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// HELPER — deterministic category color for events
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Color _eventCategoryColor(Event event) {
+  switch (event.category) {
+    case EventCategory.worship:
+      return const Color(0xFF6C63FF);
+    case EventCategory.conference:
+      return const Color(0xFF2196F3);
+    case EventCategory.youth:
+      return const Color(0xFFFF6B6B);
+    case EventCategory.prayer:
+      return const Color(0xFF4ECDC4);
+    case EventCategory.outreach:
+      return const Color(0xFFF59E0B);
+    case EventCategory.fellowship:
+      return const Color(0xFF8B5CF6);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // EVENT CARD — with photo preview row + registration confirmation sheet
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -888,7 +908,7 @@ class _EventCardState extends State<_EventCard>
               ),
             ),
             Text(
-              widget.event.date,
+              widget.event.dateFormatted,
               style: AppTextStyles.bodySmall.copyWith(
                 color: isDark
                     ? AppColors.textSecondaryDark
@@ -958,80 +978,46 @@ class _EventCardState extends State<_EventCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner image
-            SizedBox(
+            // Banner image placeholder
+            Container(
               height: 160,
               width: double.infinity,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(AppRadius.xl)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CachedNetworkImage(
-                      imageUrl:
-                          'https://picsum.photos/seed/${widget.event.id}/800/400',
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              widget.event.imageColor,
-                              widget.event.imageColor
-                                  .withValues(alpha: 0.7),
-                            ],
-                          ),
-                        ),
-                      ),
-                      errorWidget: (_, __, ___) => Container(
-                        color: widget.event.imageColor,
-                        child: Icon(Icons.event,
-                            color: Colors.white.withValues(alpha: 0.3),
-                            size: 64),
-                      ),
-                    ),
-                    // Dark gradient overlay at bottom
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: Container(
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              Colors.black.withValues(alpha: 0.45),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: widget.isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary,
-                          borderRadius: AppRadius.borderRadiusSm,
-                        ),
-                        child: Text(
-                          widget.event.date
-                              .split('\u00b7')
-                              .first
-                              .trim(),
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.textInverse,
-                          ),
-                        ),
-                      ),
-                    ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _eventCategoryColor(widget.event),
+                    _eventCategoryColor(widget.event).withValues(alpha: 0.7),
                   ],
                 ),
+              ),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Icon(Icons.event,
+                        color: Colors.white.withValues(alpha: 0.3),
+                        size: 64),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: widget.isDark
+                            ? AppColors.primaryLight
+                            : AppColors.primary,
+                        borderRadius: AppRadius.borderRadiusSm,
+                      ),
+                      child: Text(
+                        widget.event.dateFormatted,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textInverse,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             // Content
@@ -1046,7 +1032,7 @@ class _EventCardState extends State<_EventCard>
                           size: 14, color: AppColors.gold),
                       const SizedBox(width: 6),
                       Text(
-                        widget.event.date,
+                        '${widget.event.dateFormatted} \u00b7 ${widget.event.timeFormatted}',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: widget.isDark
                               ? AppColors.textSecondaryDark
@@ -1074,7 +1060,7 @@ class _EventCardState extends State<_EventCard>
                               : AppColors.textSecondary),
                       const SizedBox(width: 4),
                       Text(
-                        widget.event.location,
+                        widget.event.location ?? '',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: widget.isDark
                               ? AppColors.textSecondaryDark
@@ -1117,7 +1103,7 @@ class _EventCardState extends State<_EventCard>
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        '+${widget.event.attendees} attending',
+                        '+${widget.event.registeredCount} attending',
                         style: AppTextStyles.bodySmall.copyWith(
                           color: widget.isDark
                               ? AppColors.textSecondaryDark
@@ -1126,57 +1112,6 @@ class _EventCardState extends State<_EventCard>
                       ),
                     ],
                   ),
-
-                  // ── Photo Preview Row ─────────────────────────────
-                  if (widget.event.isRecurring &&
-                      widget.event.pastPhotos.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sp3),
-                    Text(
-                      'From past editions',
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: widget.isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.sp2),
-                    SizedBox(
-                      height: 52,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: widget.event.pastPhotos.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(width: 8),
-                        itemBuilder: (_, i) {
-                          return ClipRRect(
-                            borderRadius: AppRadius.borderRadiusSm,
-                            child: CachedNetworkImage(
-                              imageUrl:
-                                  'https://picsum.photos/seed/${widget.event.id}_$i/144/104',
-                              width: 72,
-                              height: 52,
-                              fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(
-                                width: 72,
-                                height: 52,
-                                color: widget.event.pastPhotos[i],
-                              ),
-                              errorWidget: (_, __, ___) => Container(
-                                width: 72,
-                                height: 52,
-                                color: widget.event.pastPhotos[i],
-                                child: Icon(Icons.photo,
-                                    size: 18,
-                                    color: Colors.white
-                                        .withValues(alpha: 0.4)),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
 
                   const SizedBox(height: AppSpacing.sp3),
                   // Register button
