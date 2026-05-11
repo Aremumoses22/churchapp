@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/community.dart';
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -10,12 +13,29 @@ import '../../shared/widgets/widgets.dart';
 // "Share Your Testimony" FAB, content cards with quotation-mark accent.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class TestimoniesScreen extends StatelessWidget {
+class TestimoniesScreen extends ConsumerWidget {
   const TestimoniesScreen({super.key});
 
+  static _TestimonyData _fromApi(Testimony t) => _TestimonyData(
+        id: t.id,
+        author: t.isAnonymous ? 'Anonymous' : (t.authorName ?? 'Member'),
+        date: t.createdAt ?? '',
+        category: '',
+        title: t.title,
+        content: t.content,
+        likes: t.likeCount,
+        prayers: t.prayCount,
+        comments: 0,
+        isLiked: t.hasLiked,
+      );
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final apiData = ref.watch(testimoniesFutureProvider).value;
+    final testimonies = (apiData != null && apiData.isNotEmpty)
+        ? apiData.map(_fromApi).toList()
+        : _testimonies;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -42,9 +62,9 @@ class TestimoniesScreen extends StatelessWidget {
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(AppSpacing.screenHorizontalPadding),
-        itemCount: _testimonies.length,
+        itemCount: testimonies.length,
         itemBuilder: (context, index) {
-          final t = _testimonies[index];
+          final t = testimonies[index];
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.cardGap),
             child: _TestimonyCard(testimony: t, isDark: isDark),
@@ -188,7 +208,7 @@ class _TestimonyCard extends StatelessWidget {
                       backgroundColor:
                           _categoryColor.withValues(alpha: 0.15),
                       child: Text(
-                        testimony.author[0],
+                        testimony.author.isNotEmpty ? testimony.author[0] : '?',
                         style: AppTextStyles.labelMedium.copyWith(
                           color: _categoryColor,
                         ),

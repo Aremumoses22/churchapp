@@ -48,6 +48,22 @@ class _ForumScreenState extends ConsumerState<ForumScreen> {
     final trendingTopics = fState.trending;
     final filteredThreads = fState.filteredThreads;
 
+    ref.listen(forumCategoriesProvider, (_, next) {
+      next.whenData((data) {
+        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(categories: data);
+      });
+    });
+    ref.listen(forumTrendingProvider, (_, next) {
+      next.whenData((data) {
+        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(trending: data);
+      });
+    });
+    ref.listen(forumRecentProvider, (_, next) {
+      next.whenData((data) {
+        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(recentThreads: data);
+      });
+    });
+
     return Scaffold(
       appBar: AppFilledAppBar(
         title: 'Community Forum',

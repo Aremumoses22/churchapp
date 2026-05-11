@@ -1,6 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/providers/forum_providers.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -23,16 +26,16 @@ import '../../shared/widgets/inputs.dart';
 ///   - Optional preselected category
 /// ══════════════════════════════════════════════════════════════════════════════
 
-class CreatePostScreen extends StatefulWidget {
+class CreatePostScreen extends ConsumerStatefulWidget {
   const CreatePostScreen({super.key, this.preselectedCategory});
 
   final String? preselectedCategory;
 
   @override
-  State<CreatePostScreen> createState() => _CreatePostScreenState();
+  ConsumerState<CreatePostScreen> createState() => _CreatePostScreenState();
 }
 
-class _CreatePostScreenState extends State<CreatePostScreen> {
+class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   final _titleCtrl = TextEditingController();
   final _bodyCtrl = TextEditingController();
   String? _selectedCategory;
@@ -85,17 +88,41 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     if (!_canSubmit) return;
     setState(() => _isSubmitting = true);
 
-    // Simulate network delay
-    await Future.delayed(const Duration(milliseconds: 800));
+    final apiCategories = ref.read(forumCategoriesProvider).value ?? [];
+    final selectedName = _selectedCategory?.toLowerCase() ?? '';
+    var categoryId = _selectedCategory ?? '';
+    for (final c in apiCategories) {
+      if (c.label.toLowerCase() == selectedName) {
+        categoryId = c.id;
+        break;
+      }
+    }
+
+    final res = await ref.read(apiForumRepositoryProvider).createThread(
+      categoryId: categoryId,
+      title: _titleCtrl.text.trim(),
+      content: _bodyCtrl.text.trim(),
+    );
 
     if (!mounted) return;
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Your post has been published!'),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    setState(() => _isSubmitting = false);
+    if (res.success) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Your post has been published!'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(res.message.isEmpty ? 'Failed to publish. Please try again.' : res.message),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   void _showCategoryPicker() {

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -11,14 +13,14 @@ import '../../shared/widgets/widgets.dart';
 // share options, referral tracking.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class InviteFriendsScreen extends StatelessWidget {
+class InviteFriendsScreen extends ConsumerWidget {
   const InviteFriendsScreen({super.key});
 
-  static const _inviteLink = 'https://gracechurch.app/invite/abc123';
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final invite = ref.watch(inviteProvider);
+    final inviteLink = invite?.link ?? 'https://gracechurch.app/invite/abc123';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -186,7 +188,7 @@ class InviteFriendsScreen extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            _inviteLink,
+                            inviteLink,
                             style: AppTextStyles.bodySmall.copyWith(
                               color: isDark
                                   ? AppColors.textSecondaryDark
@@ -199,7 +201,7 @@ class InviteFriendsScreen extends StatelessWidget {
                         GestureDetector(
                           onTap: () {
                             Clipboard.setData(
-                              const ClipboardData(text: _inviteLink),
+                              ClipboardData(text: inviteLink),
                             );
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

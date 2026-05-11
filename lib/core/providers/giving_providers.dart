@@ -8,11 +8,61 @@ import '../repositories/giving_repository.dart';
 // GIVING PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-final givingRepositoryProvider = Provider<GivingRepository>((_) {
+final givingRepositoryProvider = Provider<MockGivingRepository>((_) {
   return MockGivingRepository();
 });
 
-// ── State ────────────────────────────────────────────────────────────────────
+final apiGivingRepositoryProvider = Provider<ApiGivingRepository>((_) {
+  return ApiGivingRepository();
+});
+
+// ── API async providers ───────────────────────────────────────────────────────
+
+final givingCategoriesProvider =
+    FutureProvider<List<GivingCategory>>((ref) async {
+  final res =
+      await ref.watch(apiGivingRepositoryProvider).getCategories();
+  return res.data ?? [];
+});
+
+final givingSummaryProvider = FutureProvider<GivingSummary?>((ref) async {
+  final res = await ref.watch(apiGivingRepositoryProvider).getSummary();
+  return res.success ? res.data : null;
+});
+
+final givingCampaignsProvider =
+    FutureProvider<List<GivingCampaign>>((ref) async {
+  final res =
+      await ref.watch(apiGivingRepositoryProvider).getCampaigns();
+  return res.data;
+});
+
+final givingCampaignProvider =
+    FutureProvider.family<GivingCampaign?, String>((ref, id) async {
+  final res =
+      await ref.watch(apiGivingRepositoryProvider).getCampaign(id);
+  return res.success ? res.data : null;
+});
+
+final givingPledgesProvider = FutureProvider<List<Pledge>>((ref) async {
+  final res = await ref.watch(apiGivingRepositoryProvider).getPledges();
+  return res.data;
+});
+
+final givingPaymentMethodsProvider =
+    FutureProvider<List<PaymentMethod>>((ref) async {
+  final res =
+      await ref.watch(apiGivingRepositoryProvider).getPaymentMethods();
+  return res.data ?? [];
+});
+
+final givingRecurringProvider =
+    FutureProvider<List<RecurringDonation>>((ref) async {
+  final res = await ref.watch(apiGivingRepositoryProvider).getRecurring();
+  return res.data ?? [];
+});
+
+// ── Form state (local UI) ─────────────────────────────────────────────────────
 
 class GivingState {
   const GivingState({
@@ -36,7 +86,7 @@ class GivingState {
   final int? selectedAmount;
   final bool isCustom;
   final String customAmount;
-  final int frequency; // 0=One-time, 1=Weekly, 2=Monthly
+  final int frequency;
   final int paymentMethod;
   final bool reminderEnabled;
   final int reminderFrequency;
@@ -78,17 +128,15 @@ class GivingState {
   }
 }
 
-// ── Notifier ─────────────────────────────────────────────────────────────────
-
 class GivingNotifier extends StateNotifier<GivingState> {
   GivingNotifier(this._repo) : super(const GivingState()) {
     _init();
   }
-  final GivingRepository _repo;
+  final MockGivingRepository _repo;
 
   void _init() {
     state = state.copyWith(
-      categories: _repo.getCategories(),
+      categories: _repo.getFormCategories(),
       amountPresets: _repo.getAmountPresets(),
       savedCards: _repo.getSavedCards(),
     );
@@ -118,8 +166,14 @@ class GivingNotifier extends StateNotifier<GivingState> {
   void setReminderFrequency(int f) =>
       state = state.copyWith(reminderFrequency: f);
 
+  void updateCategoriesFromApi(List<GivingCategory> apiCats) {
+    state = state.copyWith(
+      categories: apiCats.map((c) => c.name).toList(),
+    );
+  }
+
   void reset() => state = GivingState(
-        categories: _repo.getCategories(),
+        categories: _repo.getFormCategories(),
         amountPresets: _repo.getAmountPresets(),
         savedCards: _repo.getSavedCards(),
       );

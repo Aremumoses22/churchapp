@@ -1,17 +1,17 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../models/home_feed.dart';
+import '../repositories/home_feed_repository.dart';
+
 // ──────────────────────────────────────────────────────────────────────────────
-// REPOSITORIES — Barrel File
+// HOME FEED PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-export 'auth_repository.dart';
-export 'bible_repository.dart';
-export 'chat_repository.dart';
-export 'church_info_repository.dart';
-export 'community_repository.dart';
-export 'event_repository.dart';
-export 'forum_repository.dart';
-export 'giving_repository.dart';
-export 'home_feed_repository.dart';
-export 'notification_repository.dart';
-export 'search_repository.dart';
-export 'sermon_repository.dart';
-export 'user_repository.dart';
+final homeFeedRepositoryProvider = Provider<ApiHomeFeedRepository>((_) {
+  return ApiHomeFeedRepository();
+});
+
+final homeFeedProvider = FutureProvider<HomeFeed?>((ref) async {
+  final res = await ref.watch(homeFeedRepositoryProvider).getFeed();
+  return res.success ? res.data : null;
+});

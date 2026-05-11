@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // CONTACT US SCREEN
-//
-// Church address with map placeholder, phone, email, social media links,
-// "Send a Message" form.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ContactUsScreen extends StatefulWidget {
+class ContactUsScreen extends ConsumerStatefulWidget {
   const ContactUsScreen({super.key});
 
   @override
-  State<ContactUsScreen> createState() => _ContactUsScreenState();
+  ConsumerState<ContactUsScreen> createState() => _ContactUsScreenState();
 }
 
-class _ContactUsScreenState extends State<ContactUsScreen> {
+class _ContactUsScreenState extends ConsumerState<ContactUsScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _subjectController = TextEditingController();
@@ -32,16 +31,61 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
     super.dispose();
   }
 
+  Future<void> _sendMessage() async {
+    final subject = _subjectController.text.trim();
+    final message = _messageController.text.trim();
+    if (subject.isEmpty || message.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please fill in the subject and message.'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.borderRadiusSm),
+        ),
+      );
+      return;
+    }
+    await ref.read(contactFormProvider.notifier).send(subject, message);
+    final state = ref.read(contactFormProvider);
+    if (!mounted) return;
+    if (state.success) {
+      _subjectController.clear();
+      _messageController.clear();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Message sent! We will respond soon.'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.borderRadiusSm),
+        ),
+      );
+      ref.read(contactFormProvider.notifier).reset();
+    } else if (state.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(state.error!),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: AppRadius.borderRadiusSm),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final church = ref.watch(churchAboutProvider).value;
+    final formState = ref.watch(contactFormProvider);
+
+    final phone = church?.phone ?? '(555) 123-4567';
+    final email = church?.email ?? 'hello@grace.church';
+    final address = church?.address ?? '1234 Grace Avenue, Downtown\nSpringfield, IL 62701';
+    final socialLinks = church?.socialLinks;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      appBar: AppFilledAppBar(
-        title: 'Contact Us',
-        showBack: true,
-      ),
+      appBar: AppFilledAppBar(title: 'Contact Us', showBack: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.screenHorizontalPadding),
         child: Column(
@@ -49,7 +93,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
           children: [
             const SizedBox(height: AppSpacing.sp4),
 
-            // ── Map placeholder ──────────────────────────────────────
+            // ── Map placeholder ──────────────────────────────────────────
             Container(
               height: 180,
               width: double.infinity,
@@ -62,21 +106,11 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.map_outlined,
-                      size: 48,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.primary.withValues(alpha: 0.4),
-                    ),
+                    Icon(Icons.map_outlined, size: 48, color: isDark ? AppColors.textSecondaryDark : AppColors.primary.withValues(alpha: 0.4)),
                     const SizedBox(height: AppSpacing.sp2),
                     Text(
-                      '1234 Grace Avenue, Downtown\nSpringfield, IL 62701',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                      ),
+                      address,
+                      style: AppTextStyles.bodySmall.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
                       textAlign: TextAlign.center,
                     ),
                   ],
@@ -86,14 +120,14 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
             const SizedBox(height: AppSpacing.sp6),
 
-            // ── Contact info cards ───────────────────────────────────
+            // ── Contact info cards ───────────────────────────────────────
             Row(
               children: [
                 Expanded(
                   child: _ContactTile(
                     icon: Icons.phone_outlined,
                     label: 'Call Us',
-                    value: '(555) 123-4567',
+                    value: phone,
                     color: const Color(0xFF059669),
                     isDark: isDark,
                     onTap: () {},
@@ -104,7 +138,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                   child: _ContactTile(
                     icon: Icons.mail_outlined,
                     label: 'Email',
-                    value: 'hello@grace.church',
+                    value: email,
                     color: const Color(0xFF3B82F6),
                     isDark: isDark,
                     onTap: () {},
@@ -143,72 +177,39 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
 
             const SizedBox(height: AppSpacing.sp8),
 
-            // ── Social media ─────────────────────────────────────────
+            // ── Social media ─────────────────────────────────────────────
             Text(
               'Follow Us',
-              style: AppTextStyles.headingSmall.copyWith(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
+              style: AppTextStyles.headingSmall.copyWith(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.sp4),
             Row(
               mainAxisAlignment: MainAxisAlignment.start,
               children: [
-                _SocialButton(
-                  icon: Icons.language,
-                  label: 'Website',
-                  color: const Color(0xFF1E40AF),
-                  isDark: isDark,
-                  onTap: () {},
-                ),
+                if (socialLinks?.facebook != null || church == null)
+                  _SocialButton(icon: Icons.facebook_outlined, label: 'Facebook', color: const Color(0xFF1877F2), isDark: isDark, onTap: () {}),
                 const SizedBox(width: AppSpacing.sp4),
-                _SocialButton(
-                  icon: Icons.play_circle_outline,
-                  label: 'YouTube',
-                  color: const Color(0xFFDC2626),
-                  isDark: isDark,
-                  onTap: () {},
-                ),
+                if (socialLinks?.instagram != null || church == null)
+                  _SocialButton(icon: Icons.camera_alt_outlined, label: 'Instagram', color: const Color(0xFFE1306C), isDark: isDark, onTap: () {}),
                 const SizedBox(width: AppSpacing.sp4),
-                _SocialButton(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'Instagram',
-                  color: const Color(0xFFE1306C),
-                  isDark: isDark,
-                  onTap: () {},
-                ),
+                if (socialLinks?.youtube != null || church == null)
+                  _SocialButton(icon: Icons.play_circle_outline, label: 'YouTube', color: const Color(0xFFDC2626), isDark: isDark, onTap: () {}),
                 const SizedBox(width: AppSpacing.sp4),
-                _SocialButton(
-                  icon: Icons.facebook_outlined,
-                  label: 'Facebook',
-                  color: const Color(0xFF1877F2),
-                  isDark: isDark,
-                  onTap: () {},
-                ),
+                _SocialButton(icon: Icons.language, label: 'Website', color: const Color(0xFF1E40AF), isDark: isDark, onTap: () {}),
               ],
             ),
 
             const SizedBox(height: AppSpacing.sp8),
 
-            // ── Send a message ───────────────────────────────────────
+            // ── Send a message ───────────────────────────────────────────
             Text(
               'Send a Message',
-              style: AppTextStyles.headingSmall.copyWith(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
+              style: AppTextStyles.headingSmall.copyWith(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
             ),
             const SizedBox(height: AppSpacing.sp2),
             Text(
               'Have a question or need prayer? We would love to hear from you.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-              ),
+              style: AppTextStyles.bodyMedium.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary),
             ),
 
             const SizedBox(height: AppSpacing.sp4),
@@ -245,21 +246,12 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
             const SizedBox(height: AppSpacing.sp6),
 
             AppPrimaryButton(
-              label: 'Send Message',
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Message sent! We will respond soon.'),
-                    backgroundColor: AppColors.success,
-                    behavior: SnackBarBehavior.floating,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: AppRadius.borderRadiusSm,
-                    ),
-                  ),
-                );
-              },
+              label: formState.isLoading ? 'Sending...' : 'Send Message',
+              onPressed: formState.isLoading ? null : _sendMessage,
               isFullWidth: true,
-              icon: const Icon(Icons.send_outlined, color: Colors.white, size: 18),
+              icon: formState.isLoading
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.send_outlined, color: Colors.white, size: 18),
             ),
 
             const SizedBox(height: AppSpacing.sp12),
@@ -305,34 +297,13 @@ class _ContactTile extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Icon(icon, color: color, size: 20),
-              ),
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+              child: Center(child: Icon(icon, color: color, size: 20)),
             ),
             const SizedBox(height: AppSpacing.sp2),
-            Text(
-              label,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textDisabled,
-                fontSize: 11,
-              ),
-            ),
+            Text(label, style: AppTextStyles.bodySmall.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textDisabled, fontSize: 11)),
             const SizedBox(height: 2),
-            Text(
-              value,
-              style: AppTextStyles.labelSmall.copyWith(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text(value, style: AppTextStyles.labelSmall.copyWith(color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -364,24 +335,11 @@ class _SocialButton extends StatelessWidget {
           Container(
             width: 48,
             height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Icon(icon, color: color, size: 22),
-            ),
+            decoration: BoxDecoration(color: color.withValues(alpha: 0.1), shape: BoxShape.circle),
+            child: Center(child: Icon(icon, color: color, size: 22)),
           ),
           const SizedBox(height: AppSpacing.sp1),
-          Text(
-            label,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
-              fontSize: 10,
-            ),
-          ),
+          Text(label, style: AppTextStyles.bodySmall.copyWith(color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondary, fontSize: 10)),
         ],
       ),
     );

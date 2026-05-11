@@ -27,6 +27,14 @@ class _ConnectGroupsScreenState extends ConsumerState<ConnectGroupsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cState = ref.watch(communityNotifierProvider);
 
+    ref.listen(groupsProvider, (_, next) {
+      next.whenData((groups) {
+        if (groups.isNotEmpty) {
+          ref.read(communityNotifierProvider.notifier).updateGroupsFromApi(groups);
+        }
+      });
+    });
+
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
       appBar: AppFilledAppBar(

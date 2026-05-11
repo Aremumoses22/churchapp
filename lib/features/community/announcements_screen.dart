@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/community.dart';
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -10,8 +13,22 @@ import '../../shared/widgets/widgets.dart';
 // images, date stamps, "New" badge.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class AnnouncementsScreen extends StatelessWidget {
+class AnnouncementsScreen extends ConsumerWidget {
   const AnnouncementsScreen({super.key});
+
+  static _Announcement _fromApi(Announcement a) => _Announcement(
+        id: a.id,
+        title: a.title,
+        body: a.content,
+        date: a.publishedAt ?? '',
+        timeAgo: a.publishedAt ?? '',
+        priority: a.isUrgent
+            ? _Priority.urgent
+            : (a.isPinned ? _Priority.high : _Priority.normal),
+        isNew: !a.isRead,
+        hasImage: a.imageUrl != null,
+        category: a.category ?? 'General',
+      );
 
   static const _announcements = [
     _Announcement(
@@ -89,8 +106,12 @@ class AnnouncementsScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final apiData = ref.watch(announcementsFutureProvider).value;
+    final announcements = (apiData != null && apiData.isNotEmpty)
+        ? apiData.map(_fromApi).toList()
+        : _announcements;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -114,12 +135,12 @@ class AnnouncementsScreen extends StatelessWidget {
           horizontal: AppSpacing.screenHorizontalPadding,
           vertical: AppSpacing.sp4,
         ),
-        itemCount: _announcements.length,
+        itemCount: announcements.length,
         itemBuilder: (context, index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.cardGap),
             child: _AnnouncementCard(
-              announcement: _announcements[index],
+              announcement: announcements[index],
               isDark: isDark,
             ),
           );

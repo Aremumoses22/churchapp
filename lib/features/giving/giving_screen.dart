@@ -78,6 +78,14 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final gState = ref.watch(givingNotifierProvider);
 
+    ref.listen(givingCategoriesProvider, (_, next) {
+      next.whenData((cats) {
+        if (cats.isNotEmpty) {
+          ref.read(givingNotifierProvider.notifier).updateCategoriesFromApi(cats);
+        }
+      });
+    });
+
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
       appBar: AppFilledAppBar(

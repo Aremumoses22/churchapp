@@ -48,19 +48,7 @@ class _ForumThreadScreenState extends ConsumerState<ForumThreadScreen> {
     final text = _replyCtrl.text.trim();
     if (text.isEmpty) return;
 
-    final tState = ref.read(threadDetailNotifierProvider(widget.threadId));
-    ref.read(threadDetailNotifierProvider(widget.threadId).notifier).addReply(
-      ForumReply(
-        id: 'rep-new-${tState.replies.length}',
-        author: 'You',
-        authorInitials: 'ME',
-        avatarColor: AppColors.primary,
-        body: text,
-        timeAgo: 'Just now',
-        likes: 0,
-        isLiked: false,
-      ),
-    );
+    ref.read(threadDetailNotifierProvider(widget.threadId).notifier).addReply(text);
     _replyCtrl.clear();
 
     Timer(const Duration(milliseconds: 100), () {

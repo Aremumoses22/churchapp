@@ -67,8 +67,64 @@ abstract final class Endpoints {
   static const String events = '/events';
   static const String eventsFeatured = '/events/featured';
   static const String eventsMy = '/events/my';
-  /// GET /events/:id
   static String event(String id) => '/events/$id';
-  /// POST / DELETE /events/:id/register
   static String eventRegister(String id) => '/events/$id/register';
+
+  // ── Church Info ───────────────────────────────────────────────────────────
+  static const String churchAbout = '/church/about';
+  static const String churchStaff = '/church/staff';
+  static const String churchCampuses = '/church/campuses';
+  static const String churchFaqs = '/church/faqs';
+  static const String churchContact = '/church/contact';
+
+  // ── Home Feed ─────────────────────────────────────────────────────────────
+  static const String homeFeed = '/home/feed';
+
+  // ── Giving ────────────────────────────────────────────────────────────────
+  static const String givingCategories = '/giving/categories';
+  static const String givingSummary = '/giving/summary';
+  static const String givingDonate = '/giving/donate';
+  static const String givingVerify = '/giving/verify';
+  static const String givingHistory = '/giving/history';
+  static const String givingPaymentMethods = '/giving/payment-methods';
+  static const String givingCampaigns = '/giving/campaigns';
+  static const String givingPledges = '/giving/pledges';
+  static const String givingRecurring = '/giving/recurring';
+  static String givingReceipt(String id) => '/giving/receipts/$id';
+  static String givingReceiptDownload(String id) => '/giving/receipts/$id/download';
+  static String givingPaymentMethod(String id) => '/giving/payment-methods/$id';
+  static String givingCampaign(String id) => '/giving/campaigns/$id';
+  static String givingCampaignDonate(String id) => '/giving/campaigns/$id/donate';
+  static String givingPledgeItem(String id) => '/giving/pledges/$id';
+  static String givingPledgePay(String id) => '/giving/pledges/$id/pay';
+  static String givingRecurringItem(String id) => '/giving/recurring/$id';
+
+  // ── Groups ────────────────────────────────────────────────────────────────
+  static const String groups = '/groups';
+  static String group(String id) => '/groups/$id';
+  static String groupJoin(String id) => '/groups/$id/join';
+  static String groupLeave(String id) => '/groups/$id/leave';
+
+  // ── Community ─────────────────────────────────────────────────────────────
+  static const String announcements = '/community/announcements';
+  static String announcement(String id) => '/community/announcements/$id';
+  static String announcementRead(String id) => '/community/announcements/$id/read';
+  static const String testimonies = '/community/testimonies';
+  static String testimonyReact(String id) => '/community/testimonies/$id/react';
+  static const String directory = '/community/directory';
+  static const String inviteGenerate = '/community/invite/generate';
+  static const String inviteStats = '/community/invite/stats';
+  static String inviteValidate(String code) => '/community/invite/$code';
+
+  // ── Forum ─────────────────────────────────────────────────────────────────
+  static const String forumCategories = '/forum/categories';
+  static const String forumTrending = '/forum/trending';
+  static const String forumRecent = '/forum/recent';
+  static String forumCategoryThreads(String id) => '/forum/categories/$id/threads';
+  static const String forumThreads = '/forum/threads';
+  static String forumThread(String id) => '/forum/threads/$id';
+  static String forumThreadReplies(String id) => '/forum/threads/$id/replies';
+  static String forumThreadLike(String id) => '/forum/threads/$id/like';
+  static String forumThreadBookmark(String id) => '/forum/threads/$id/bookmark';
+  static String forumReplyLike(String id) => '/forum/replies/$id/like';
 }

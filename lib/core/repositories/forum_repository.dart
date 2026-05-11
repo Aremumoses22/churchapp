@@ -1,10 +1,17 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 
+import '../config/api_config.dart';
+import '../models/api_response.dart';
 import '../models/forum.dart';
+import '../services/api_client.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // FORUM REPOSITORY
+//
+// Covers /forum/* endpoints
+// See API_INTEGRATION_GUIDE.md § 13
 // ──────────────────────────────────────────────────────────────────────────────
 
 abstract class ForumRepository {
@@ -169,38 +176,10 @@ class MockForumRepository implements ForumRepository {
           category: 'Youth Forum',
           categoryColor: Color(0xFFF59E0B),
           body:
-              'What an incredible week at summer camp! 23 young people gave their lives to Christ. Here are some highlights...',
+              'What an incredible week at summer camp! 23 young people gave their lives to Christ.',
           replies: 19,
           likes: 94,
           timeAgo: '6h ago',
-        ),
-        ForumThread(
-          id: 'r4',
-          title: 'Understanding Romans 8:28 in difficult seasons',
-          author: 'Grace L.',
-          authorInitials: 'GL',
-          avatarColor: Color(0xFF3B82F6),
-          category: 'Bible Discussion',
-          categoryColor: Color(0xFF3B82F6),
-          body:
-              'I have been studying Romans 8 and wanted to share some thoughts on how "all things work together" does not mean all things are good...',
-          replies: 24,
-          likes: 45,
-          timeAgo: '1d ago',
-        ),
-        ForumThread(
-          id: 'r5',
-          title: 'Testimony: God provided a job after 6 months',
-          author: 'Michael R.',
-          authorInitials: 'MR',
-          avatarColor: Color(0xFF059669),
-          category: 'Testimonies',
-          categoryColor: Color(0xFF8B5CF6),
-          body:
-              'I want to glorify God for His faithfulness. After 6 months of unemployment and many tears, He opened a door...',
-          replies: 42,
-          likes: 118,
-          timeAgo: '1d ago',
         ),
       ];
 
@@ -213,7 +192,7 @@ class MockForumRepository implements ForumRepository {
           authorInitials: 'AD',
           avatarColor: const Color(0xFF1E40AF),
           body:
-              'Welcome! Please read the community guidelines before posting. Be respectful, kind, and Christ-centered in all interactions.',
+              'Welcome! Please read the community guidelines before posting.',
           replies: 8,
           likes: 45,
           timeAgo: '3d ago',
@@ -226,78 +205,17 @@ class MockForumRepository implements ForumRepository {
           authorInitials: 'RT',
           avatarColor: const Color(0xFF8B5CF6),
           body:
-              'I wanted to open a space for us to share what God has been putting on our hearts this season. I will go first...',
+              'I wanted to open a space for us to share what God has been putting on our hearts this season.',
           replies: 23,
           likes: 56,
           timeAgo: '5h ago',
-        ),
-        ForumThread(
-          id: '$categoryId-3',
-          title: 'Book recommendation: "Mere Christianity"',
-          author: 'Thomas A.',
-          authorInitials: 'TA',
-          avatarColor: const Color(0xFF059669),
-          body:
-              'I just finished re-reading C.S. Lewis and was reminded how powerfully he articulates the faith. Anyone else a fan?',
-          replies: 15,
-          likes: 38,
-          timeAgo: '12h ago',
-        ),
-        ForumThread(
-          id: '$categoryId-4',
-          title: 'How do you handle doubt in your faith?',
-          author: 'Nathan W.',
-          authorInitials: 'NW',
-          avatarColor: const Color(0xFF3B82F6),
-          body:
-              'Honest question - I have been going through a season of doubt and wondering if anyone else has experienced this...',
-          replies: 41,
-          likes: 89,
-          timeAgo: '1d ago',
-        ),
-        ForumThread(
-          id: '$categoryId-5',
-          title: 'Favourite worship songs this month?',
-          author: 'Lydia P.',
-          authorInitials: 'LP',
-          avatarColor: const Color(0xFFEC4899),
-          body:
-              'What songs have been speaking to your soul? I cannot stop listening to "Goodness of God" by Bethel...',
-          replies: 29,
-          likes: 61,
-          timeAgo: '1d ago',
-        ),
-        ForumThread(
-          id: '$categoryId-6',
-          title: 'Starting a small group - who is interested?',
-          author: 'Pastor James',
-          authorInitials: 'PJ',
-          avatarColor: const Color(0xFFF59E0B),
-          body:
-              'Thinking about starting a Tuesday evening study group. We would go through Philippians together over 6 weeks.',
-          replies: 17,
-          likes: 44,
-          timeAgo: '2d ago',
-        ),
-        ForumThread(
-          id: '$categoryId-7',
-          title: 'Encouraging verse for hard days',
-          author: 'Grace L.',
-          authorInitials: 'GL',
-          avatarColor: const Color(0xFF6366F1),
-          body:
-              '"Come to me, all who are weary and burdened, and I will give you rest." - Matthew 11:28. This verse has carried me.',
-          replies: 33,
-          likes: 102,
-          timeAgo: '3d ago',
         ),
       ];
 
   @override
   ForumCategory? getCategoryMeta(String categoryId) {
-    final categories = getCategories();
     try {
-      return categories.firstWhere((c) => c.id == categoryId);
+      return getCategories().firstWhere((c) => c.id == categoryId);
     } catch (_) {
       return null;
     }
@@ -305,16 +223,18 @@ class MockForumRepository implements ForumRepository {
 
   @override
   ForumPost getPost(String threadId) => const ForumPost(
+        id: 'mock',
         title: 'Please pray for healing - upcoming surgery',
         author: 'David K.',
         authorInitials: 'DK',
         avatarColor: Color(0xFFEF4444),
         body:
-            'Dear church family,\n\nI have surgery scheduled for next Thursday and I am honestly nervous. The doctors say the procedure is routine, but I would really appreciate the church family covering me in prayer during this time.\n\nSpecifically, I am asking for:\n  - Peace and calm leading up to the day\n  - Wisdom and skill for the surgical team\n  - A quick and complete recovery\n  - Strength for my wife and kids during the wait\n\n"Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God." - Philippians 4:6\n\nThank you all for your love and support. This community means everything to me. God bless you all.',
+            'Dear church family,\n\nI have surgery scheduled for next Thursday. Please cover me in prayer.\n\n"Do not be anxious about anything, but in every situation, by prayer and petition, with thanksgiving, present your requests to God." - Philippians 4:6',
         category: 'Prayer Requests',
         categoryColor: Color(0xFFEF4444),
         timeAgo: '4 hours ago',
         views: 234,
+        likeCount: 67,
       );
 
   @override
@@ -324,8 +244,7 @@ class MockForumRepository implements ForumRepository {
           author: 'Sarah M.',
           authorInitials: 'SM',
           avatarColor: Color(0xFF8B5CF6),
-          body:
-              'Praying for you, David! God is in control and He will see you through. "The Lord is my shepherd, I shall not want." You have got this!',
+          body: 'Praying for you, David! God is in control.',
           timeAgo: '3h ago',
           likes: 12,
         ),
@@ -335,7 +254,7 @@ class MockForumRepository implements ForumRepository {
           authorInitials: 'PJ',
           avatarColor: Color(0xFFF59E0B),
           body:
-              'Brother David, I will be praying specifically for you and your family this week. I would also like to organize a prayer chain for Thursday morning - will announce at Wednesday service. You are covered!',
+              'Brother David, I will be praying specifically for you and your family this week.',
           timeAgo: '3h ago',
           likes: 24,
         ),
@@ -345,29 +264,242 @@ class MockForumRepository implements ForumRepository {
           authorInitials: 'GL',
           avatarColor: Color(0xFF3B82F6),
           body:
-              'Just prayed for you right now. Isaiah 41:10 - "Fear not, for I am with you; be not dismayed, for I am your God." Standing with you in faith!',
+              'Isaiah 41:10 — "Fear not, for I am with you." Standing with you in faith!',
           timeAgo: '2h ago',
           likes: 9,
         ),
-        ForumReply(
-          id: 'rep4',
-          author: 'Michael R.',
-          authorInitials: 'MR',
-          avatarColor: Color(0xFF059669),
-          body:
-              'David, I went through a similar surgery last year. God was so faithful. If you need anything - meals, rides, someone to talk to - do not hesitate. We are family!',
-          timeAgo: '1h ago',
-          likes: 15,
-        ),
-        ForumReply(
-          id: 'rep5',
-          author: 'Rebecca T.',
-          authorInitials: 'RT',
-          avatarColor: Color(0xFFEC4899),
-          body:
-              'Lifting you up. Our small group will be praying for you at our meeting tomorrow night. You are so loved by this church!',
-          timeAgo: '45m ago',
-          likes: 7,
-        ),
       ];
+}
+
+// ── Real API repository ───────────────────────────────────────────────────────
+
+class ApiForumRepository implements ForumRepository {
+  ApiForumRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+
+  final Dio _dio;
+
+  // Legacy sync methods not used with real API — return empty
+  @override
+  List<ForumCategory> getCategories() => [];
+  @override
+  List<ForumThread> getTrendingTopics() => [];
+  @override
+  List<ForumThread> getRecentThreads() => [];
+  @override
+  List<ForumThread> getThreadsForCategory(String categoryId) => [];
+  @override
+  ForumCategory? getCategoryMeta(String categoryId) => null;
+  @override
+  ForumPost getPost(String threadId) => const ForumPost(
+        title: '',
+        author: '',
+        authorInitials: '',
+        avatarColor: Color(0xFF64748B),
+        body: '',
+        category: '',
+        categoryColor: Color(0xFF64748B),
+        timeAgo: '',
+        views: 0,
+      );
+  @override
+  List<ForumReply> getReplies(String threadId) => [];
+
+  // ── Async API methods ─────────────────────────────────────────────────────
+
+  Future<ApiResponse<List<ForumCategory>>> fetchCategories() async {
+    try {
+      final res = await _dio.get(Endpoints.forumCategories);
+      final raw = res.data as Map<String, dynamic>;
+      final list = (raw['data'] as List?) ?? [];
+      return ApiResponse<List<ForumCategory>>(
+        success: raw['success'] as bool? ?? true,
+        message: raw['message'] as String? ?? '',
+        data: list
+            .asMap()
+            .entries
+            .map((e) =>
+                ForumCategory.fromJson(e.value as Map<String, dynamic>, index: e.key))
+            .toList(),
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<ApiResponse<List<ForumThread>>> fetchTrending() async {
+    try {
+      final res = await _dio.get(Endpoints.forumTrending);
+      final raw = res.data as Map<String, dynamic>;
+      final list = (raw['data'] as List?) ?? [];
+      return ApiResponse<List<ForumThread>>(
+        success: raw['success'] as bool? ?? true,
+        message: raw['message'] as String? ?? '',
+        data: list
+            .map((e) => ForumThread.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<PaginatedResponse<ForumThread>> fetchRecentThreads({
+    int page = 1,
+    int limit = 20,
+    String sort = 'recent',
+  }) async {
+    try {
+      final res = await _dio.get(
+        Endpoints.forumRecent,
+        queryParameters: {'page': page, 'limit': limit, 'sort': sort},
+      );
+      return PaginatedResponse<ForumThread>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: ForumThread.fromJson,
+      );
+    } on DioException catch (_) {
+      return const PaginatedResponse(
+        success: false,
+        message: 'Failed to load threads',
+        data: [],
+        meta: PaginationMeta(page: 1, limit: 20, total: 0, totalPages: 0),
+      );
+    }
+  }
+
+  Future<PaginatedResponse<ForumThread>> fetchCategoryThreads(
+    String categoryId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get(
+        Endpoints.forumCategoryThreads(categoryId),
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      return PaginatedResponse<ForumThread>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: ForumThread.fromJson,
+      );
+    } on DioException catch (_) {
+      return const PaginatedResponse(
+        success: false,
+        message: 'Failed to load threads',
+        data: [],
+        meta: PaginationMeta(page: 1, limit: 20, total: 0, totalPages: 0),
+      );
+    }
+  }
+
+  Future<ApiResponse<ForumPost>> fetchThread(String id) async {
+    try {
+      final res = await _dio.get(Endpoints.forumThread(id));
+      return ApiResponse<ForumPost>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: (d) => ForumPost.fromJson(d as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<ApiResponse<void>> createThread({
+    required String categoryId,
+    required String title,
+    required String content,
+  }) async {
+    try {
+      final res = await _dio.post(Endpoints.forumThreads, data: {
+        'categoryId': categoryId,
+        'title': title,
+        'content': content,
+      });
+      return ApiResponse.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<PaginatedResponse<ForumReply>> fetchReplies(
+    String threadId, {
+    int page = 1,
+    int limit = 20,
+  }) async {
+    try {
+      final res = await _dio.get(
+        Endpoints.forumThreadReplies(threadId),
+        queryParameters: {'page': page, 'limit': limit},
+      );
+      return PaginatedResponse<ForumReply>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: ForumReply.fromJson,
+      );
+    } on DioException catch (_) {
+      return const PaginatedResponse(
+        success: false,
+        message: 'Failed to load replies',
+        data: [],
+        meta: PaginationMeta(page: 1, limit: 20, total: 0, totalPages: 0),
+      );
+    }
+  }
+
+  Future<ApiResponse<void>> postReply(String threadId, String content) async {
+    try {
+      final res = await _dio.post(
+        Endpoints.forumThreadReplies(threadId),
+        data: {'content': content},
+      );
+      return ApiResponse.fromJson(res.data as Map<String, dynamic>);
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> toggleLike(String threadId) async {
+    try {
+      final res = await _dio.post(Endpoints.forumThreadLike(threadId));
+      return ApiResponse<Map<String, dynamic>>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: (d) => d as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> toggleBookmark(
+      String threadId) async {
+    try {
+      final res = await _dio.post(Endpoints.forumThreadBookmark(threadId));
+      return ApiResponse<Map<String, dynamic>>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: (d) => d as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> toggleReplyLike(
+      String replyId) async {
+    try {
+      final res = await _dio.post(Endpoints.forumReplyLike(replyId));
+      return ApiResponse<Map<String, dynamic>>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: (d) => d as Map<String, dynamic>,
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
+  ApiResponse<T> _err<T>(DioException e) {
+    final data = e.response?.data;
+    if (data is Map<String, dynamic>) return ApiResponse<T>.fromJson(data);
+    return ApiResponse<T>(
+      success: false,
+      message: e.message ?? 'An error occurred',
+    );
+  }
 }

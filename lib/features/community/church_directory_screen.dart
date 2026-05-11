@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -10,16 +12,17 @@ import '../../shared/widgets/widgets.dart';
 // department, tap to view profile card (bottom sheet).
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ChurchDirectoryScreen extends StatefulWidget {
+class ChurchDirectoryScreen extends ConsumerStatefulWidget {
   const ChurchDirectoryScreen({super.key});
 
   @override
-  State<ChurchDirectoryScreen> createState() => _ChurchDirectoryScreenState();
+  ConsumerState<ChurchDirectoryScreen> createState() => _ChurchDirectoryScreenState();
 }
 
-class _ChurchDirectoryScreenState extends State<ChurchDirectoryScreen> {
+class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  List<_MemberData>? _apiMembers;
 
   static const _members = [
     _MemberData(
@@ -96,10 +99,13 @@ class _ChurchDirectoryScreenState extends State<ChurchDirectoryScreen> {
     ),
   ];
 
+  List<_MemberData> get _source => _apiMembers ?? _members;
+
   List<_MemberData> get _filteredMembers {
-    if (_searchQuery.isEmpty) return _members;
+    final src = _source;
+    if (_searchQuery.isEmpty) return src;
     final q = _searchQuery.toLowerCase();
-    return _members
+    return src
         .where(
           (m) =>
               m.name.toLowerCase().contains(q) ||
@@ -129,6 +135,23 @@ class _ChurchDirectoryScreenState extends State<ChurchDirectoryScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    ref.listen(directoryProvider, (_, next) {
+      next.whenData((members) {
+        if (members.isNotEmpty) {
+          setState(() {
+            _apiMembers = members
+                .map((m) => _MemberData(
+                      name: m.name,
+                      department: m.department ?? '',
+                      role: '',
+                      joinedYear: m.joinedDate ?? '',
+                    ))
+                .toList();
+          });
+        }
+      });
+    });
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -324,7 +347,7 @@ class _MemberTile extends StatelessWidget {
                 backgroundColor:
                     _departmentColor.withValues(alpha: 0.12),
                 child: Text(
-                  member.name.split(' ').map((n) => n[0]).join(),
+                  member.name.trim().split(' ').where((n) => n.isNotEmpty).map((n) => n[0]).join(),
                   style: AppTextStyles.labelSmall.copyWith(
                     color: _departmentColor,
                   ),
@@ -426,7 +449,7 @@ class MemberProfileCard extends StatelessWidget {
                       ? AppColors.primaryLight
                       : AppColors.skyLight,
                   child: Text(
-                    name.split(' ').map((n) => n[0]).join(),
+                    name.trim().split(' ').where((n) => n.isNotEmpty).map((n) => n[0]).join(),
                     style: AppTextStyles.headingLarge.copyWith(
                       color: AppColors.primary,
                     ),
