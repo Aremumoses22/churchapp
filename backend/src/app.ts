@@ -40,6 +40,9 @@ import attendanceRoutes from './modules/attendance/attendance.routes';
 import milestonesRoutes from './modules/milestones/milestones.routes';
 import savedItemsRoutes from './modules/saved-items/saved-items.routes';
 
+// Admin dashboard
+import adminRoutes from './modules/admin/admin.routes';
+
 const app = express();
 
 // ── Global middleware ───────────────────────────────
@@ -118,6 +121,9 @@ app.use(`${apiPrefix}/search`, searchRoutes);
 app.use(`${apiPrefix}/attendance`, attendanceRoutes);
 app.use(`${apiPrefix}/milestones`, milestonesRoutes);
 app.use(`${apiPrefix}/saved-items`, savedItemsRoutes);
+
+// Admin dashboard
+app.use(`${apiPrefix}/admin`, adminRoutes);
 
 // ── Error handling ──────────────────────────────────
 app.use(notFoundHandler);

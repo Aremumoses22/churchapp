@@ -19,7 +19,15 @@
       "Bash(sed -n '46,80p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/forum/create_post_screen.dart\")",
       "Bash(sed -n '33,56p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/profile/edit_profile_screen.dart\")",
       "Bash(sed -n '366,410p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/bible/reading_plan_screen.dart\")",
-      "Bash(grep -rn \"static.*\\\\[.*\\\\]\\\\|hardcod\\\\|mock\\\\|fake\\\\|1243\\\\|999\\\\|888\\\\|777\\\\|\\\\bcount.*=.*[0-9]\\\\{2,\\\\}\\\\|viewers\\\\|watching\" \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features\" --include=\"*.dart\")"
+      "Bash(grep -rn \"static.*\\\\[.*\\\\]\\\\|hardcod\\\\|mock\\\\|fake\\\\|1243\\\\|999\\\\|888\\\\|777\\\\|\\\\bcount.*=.*[0-9]\\\\{2,\\\\}\\\\|viewers\\\\|watching\" \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features\" --include=\"*.dart\")",
+      "Bash(npx create-next-app@latest admin --typescript --tailwind --eslint --app --no-src-dir --no-import-alias --turbopack)",
+      "Bash(npx shadcn@latest init --defaults)",
+      "Bash(npx shadcn@latest add input label card badge avatar dropdown-menu separator tooltip sheet)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)"
+    ],
+    "additionalDirectories": [
+      "/Users/mbp/Documents/Practice/Church App"
     ]
   }
 }
