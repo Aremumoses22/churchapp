@@ -32,102 +32,77 @@ class TestimoniesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final apiData = ref.watch(testimoniesFutureProvider).value;
-    final testimonies = (apiData != null && apiData.isNotEmpty)
-        ? apiData.map(_fromApi).toList()
-        : _testimonies;
+    final testimoniesAsync = ref.watch(testimoniesFutureProvider);
 
-    return Scaffold(
-      backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      appBar: AppFilledAppBar(
-        title: 'Testimonies',
-        showBack: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.filter_list, color: Colors.white),
-            onPressed: () {},
-          ),
-        ],
+    final appBar = AppFilledAppBar(
+      title: 'Testimonies',
+      showBack: true,
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.filter_list, color: Colors.white),
+          onPressed: () {},
+        ),
+      ],
+    );
+
+    final fab = FloatingActionButton.extended(
+      onPressed: () {},
+      backgroundColor: AppColors.primary,
+      icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
+      label: Text(
+        'Share Testimony',
+        style: AppTextStyles.labelSmall.copyWith(color: Colors.white),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 20),
-        label: Text(
-          'Share Testimony',
-          style: AppTextStyles.labelSmall.copyWith(
-            color: Colors.white,
+    );
+
+    return testimoniesAsync.when(
+      loading: () => Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
+        appBar: appBar,
+        floatingActionButton: fab,
+        body: const Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, _) => Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
+        appBar: appBar,
+        floatingActionButton: fab,
+        body: Center(
+          child: AppEmptyState(
+            icon: Icons.volunteer_activism_outlined,
+            title: 'No Testimonies',
+            subtitle: 'Check back soon for community testimonies.',
           ),
         ),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(AppSpacing.screenHorizontalPadding),
-        itemCount: testimonies.length,
-        itemBuilder: (context, index) {
-          final t = testimonies[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.cardGap),
-            child: _TestimonyCard(testimony: t, isDark: isDark),
-          );
-        },
-      ),
+      data: (apiData) {
+        final testimonies = apiData.map(_fromApi).toList();
+        return Scaffold(
+          backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
+          appBar: appBar,
+          floatingActionButton: fab,
+          body: testimonies.isEmpty
+              ? Center(
+                  child: AppEmptyState(
+                    icon: Icons.volunteer_activism_outlined,
+                    title: 'No Testimonies',
+                    subtitle: 'Check back soon for community testimonies.',
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(AppSpacing.screenHorizontalPadding),
+                  itemCount: testimonies.length,
+                  itemBuilder: (context, index) {
+                    final t = testimonies[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.cardGap),
+                      child: _TestimonyCard(testimony: t, isDark: isDark),
+                    );
+                  },
+                ),
+        );
+      },
     );
   }
-
-  static const _testimonies = [
-    _TestimonyData(
-      id: '1',
-      author: 'Sarah M.',
-      date: '2 days ago',
-      category: 'Healing',
-      title: 'God Healed My Body',
-      content:
-          'After months of battling illness, I want to testify that God has completely healed me. The doctors were amazed at my recovery. What seemed impossible became possible through prayer and faith. I want to thank this church family for standing with me in prayer throughout this journey.',
-      likes: 48,
-      prayers: 32,
-      comments: 12,
-      isLiked: false,
-    ),
-    _TestimonyData(
-      id: '2',
-      author: 'David K.',
-      date: '5 days ago',
-      category: 'Salvation',
-      title: 'Found My Way Back',
-      content:
-          'I walked away from God for 15 years. Through the love of this community and the patient friendship of my connect group, I gave my life back to Christ. I was baptized last Sunday and I have never felt such peace and joy. God never gave up on me.',
-      likes: 93,
-      prayers: 54,
-      comments: 28,
-      isLiked: true,
-    ),
-    _TestimonyData(
-      id: '3',
-      author: 'Grace O.',
-      date: '1 week ago',
-      category: 'Provision',
-      title: 'He Provided in an Impossible Season',
-      content:
-          'When I lost my job, I was terrified. But God opened a door I never expected. Not only did I find new employment, but the new position pays more and allows me to spend more time with my children. He truly works all things together for good.',
-      likes: 67,
-      prayers: 41,
-      comments: 15,
-      isLiked: false,
-    ),
-    _TestimonyData(
-      id: '4',
-      author: 'Michael J.',
-      date: '2 weeks ago',
-      category: 'Family',
-      title: 'Restored Marriage',
-      content:
-          'My wife and I were on the brink of divorce. Through the Couples Connect group and pastoral counseling, God restored our marriage. We are more in love now than ever before. To anyone struggling in your marriage, please do not give up. God is the God of restoration.',
-      likes: 112,
-      prayers: 78,
-      comments: 34,
-      isLiked: true,
-    ),
-  ];
 }
 
 // ── Data ─────────────────────────────────────────────────────────────────────

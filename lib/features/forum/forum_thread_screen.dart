@@ -70,9 +70,36 @@ class _ForumThreadScreenState extends ConsumerState<ForumThreadScreen> {
     final post = tState.post;
     final replies = tState.replies;
 
-    if (post == null) {
+    if (tState.isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (post == null) {
+      return Scaffold(
+        appBar: AppFilledAppBar(title: 'Thread', showBack: true),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.red),
+              const SizedBox(height: 12),
+              Text(
+                tState.error ?? 'Failed to load thread',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => ref
+                    .read(threadDetailNotifierProvider(widget.threadId).notifier)
+                    .reload(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
       );
     }
 

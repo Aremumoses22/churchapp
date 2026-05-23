@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/providers/live_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -14,21 +16,20 @@ import '../../shared/widgets/widgets.dart';
 // floating reaction buttons, message input.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class LiveServiceScreen extends StatefulWidget {
+class LiveServiceScreen extends ConsumerStatefulWidget {
   const LiveServiceScreen({super.key});
 
   @override
-  State<LiveServiceScreen> createState() => _LiveServiceScreenState();
+  ConsumerState<LiveServiceScreen> createState() => _LiveServiceScreenState();
 }
 
-class _LiveServiceScreenState extends State<LiveServiceScreen>
+class _LiveServiceScreenState extends ConsumerState<LiveServiceScreen>
     with TickerProviderStateMixin {
   late final TabController _tabController;
   final TextEditingController _msgController = TextEditingController();
   final ScrollController _chatScroll = ScrollController();
-  final List<_ChatMsg> _messages = _seedMessages();
+  final List<_ChatMsg> _messages = [];
   final List<_FloatingEmoji> _emojis = [];
-  int _viewerCount = 1243;
 
   // Pulsing LIVE badge
   late final AnimationController _pulseCtrl;
@@ -62,6 +63,16 @@ class _LiveServiceScreenState extends State<LiveServiceScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final live = ref.watch(liveCurrentProvider).maybeWhen(
+          data: (d) => d,
+          orElse: () => null,
+        );
+    final viewerCount = live?.current?.viewerCount ??
+        live?.upcoming.firstOrNull?.viewerCount ??
+        0;
+    final serviceTitle = live?.current?.title ??
+        live?.upcoming.firstOrNull?.title ??
+        'Live Service';
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -71,13 +82,14 @@ class _LiveServiceScreenState extends State<LiveServiceScreen>
             // ── Video player area ──────────────────────────────────────
             _VideoPlayer(
               pulseAnim: _pulseAnim,
-              viewerCount: _viewerCount,
+              viewerCount: viewerCount,
               onBack: () => context.pop(),
             ),
 
             // ── Live info bar ──────────────────────────────────────────
             _LiveInfoBar(
-              viewerCount: _viewerCount,
+              title: serviceTitle,
+              viewerCount: viewerCount,
               isDark: isDark,
             ),
 
@@ -330,8 +342,13 @@ class _VideoPlayer extends StatelessWidget {
 // ── Live Info Bar ───────────────────────────────────────────────────────────
 
 class _LiveInfoBar extends StatelessWidget {
-  const _LiveInfoBar({required this.viewerCount, required this.isDark});
+  const _LiveInfoBar({
+    required this.title,
+    required this.viewerCount,
+    required this.isDark,
+  });
 
+  final String title;
   final int viewerCount;
   final bool isDark;
 
@@ -345,7 +362,7 @@ class _LiveInfoBar extends StatelessWidget {
         children: [
           Expanded(
             child: Text(
-              'Sunday Worship Service',
+              title,
               style: AppTextStyles.bodyLargeSemiBold.copyWith(
                 color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
               ),
@@ -735,10 +752,3 @@ class _ChatMsg {
   final bool isOwn;
 }
 
-List<_ChatMsg> _seedMessages() => [
-      const _ChatMsg(name: 'Grace', text: 'Amen! This message is so powerful', time: '10:23 AM'),
-      const _ChatMsg(name: 'David', text: 'Watching from Lagos. God bless', time: '10:24 AM'),
-      const _ChatMsg(name: 'Sarah', text: 'The worship was incredible today', time: '10:26 AM'),
-      const _ChatMsg(name: 'You', text: 'Blessed to be here!', time: '10:27 AM', isOwn: true),
-      const _ChatMsg(name: 'Michael', text: 'What a word! Glory to God', time: '10:29 AM'),
-    ];

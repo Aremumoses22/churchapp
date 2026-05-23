@@ -127,4 +127,74 @@ abstract final class Endpoints {
   static String forumThreadLike(String id) => '/forum/threads/$id/like';
   static String forumThreadBookmark(String id) => '/forum/threads/$id/bookmark';
   static String forumReplyLike(String id) => '/forum/replies/$id/like';
+
+  // ── Notifications ─────────────────────────────────────────────────────────
+  static const String notifications = '/notifications';
+  static const String notificationsUnreadCount = '/notifications/unread-count';
+  static const String notificationsReadAll = '/notifications/read-all';
+  static String notificationRead(String id) => '/notifications/$id/read';
+  static String notificationDelete(String id) => '/notifications/$id';
+
+  // ── Search ────────────────────────────────────────────────────────────────
+  static const String search = '/search';
+  static const String searchTrending = '/search/trending';
+
+  // ── Live Service ─────────────────────────────────────────────────────────
+  static const String liveCurrent = '/live/current';
+  static const String liveList = '/live';
+  static String liveById(String id) => '/live/$id';
+  static String liveChat(String id) => '/live/$id/chat';
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  static const String chatConversations = '/chat/conversations';
+  static String chatMessages(String id) => '/chat/conversations/$id/messages';
+  static String chatMarkRead(String id) => '/chat/conversations/$id/read';
+  static String chatPin(String id) => '/chat/conversations/$id/pin';
+  static String chatMute(String id) => '/chat/conversations/$id/mute';
+
+  // ── Prayer Requests ───────────────────────────────────────────────────────
+  static const String prayerRequests = '/prayer-requests';
+  static const String myPrayerRequests = '/prayer-requests/my';
+  static String prayerRequestPray(String id) => '/prayer-requests/$id/pray';
+
+  // ── Kids Check-In ─────────────────────────────────────────────────────────
+  static const String kidsChildren = '/kids/children';
+  static const String kidsRooms = '/kids/rooms';
+  static const String kidsCheckin = '/kids/checkin';
+  static const String kidsCheckout = '/kids/checkout';
+
+  // ── Volunteer ─────────────────────────────────────────────────────────────
+  static const String volunteerOpportunities = '/volunteer/opportunities';
+  static const String volunteerRoster = '/volunteer/roster';
+  static String volunteerSignup(String id) => '/volunteer/opportunities/$id/signup';
+  static String volunteerCheckin(String id) => '/volunteer/roster/$id/checkin';
+  static String volunteerSwap(String id) => '/volunteer/roster/$id/swap';
+
+  // ── Media ─────────────────────────────────────────────────────────────────
+  static const String mediaAlbums = '/media/albums';
+  static String mediaAlbum(String id) => '/media/albums/$id';
+  static String mediaAlbumPhotos(String id) => '/media/albums/$id/photos';
+  static const String mediaPodcasts = '/media/podcasts';
+  static String mediaPodcast(String id) => '/media/podcasts/$id';
+  static String mediaPodcastProgress(String id) => '/media/podcasts/$id/progress';
+  static const String mediaSongs = '/media/songs';
+  static String mediaSong(String id) => '/media/songs/$id';
+
+  // ── Bible ─────────────────────────────────────────────────────────────────
+  static const String bibleBooks = '/bible/books';
+  static String bibleChapter(String bookId, int chapter) =>
+      '/bible/$bookId/$chapter';
+  static const String bibleSearch = '/bible/search';
+  static const String bibleHighlights = '/bible/highlights';
+  static String bibleHighlight(String id) => '/bible/highlights/$id';
+  static const String devotionalsToday = '/bible/devotionals/today';
+  static const String devotionalsStreak = '/bible/devotionals/streak';
+  static String devotionalRead(String id) => '/bible/devotionals/$id/read';
+  static const String readingPlans = '/bible/reading-plans';
+  static const String myReadingPlans = '/bible/reading-plans/my';
+  static String readingPlan(String id) => '/bible/reading-plans/$id';
+  static String readingPlanEnroll(String id) =>
+      '/bible/reading-plans/$id/enroll';
+  static String readingPlanProgress(String id) =>
+      '/bible/reading-plans/$id/progress';
 }

@@ -1,42 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/event.dart';
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MY EVENTS SCREEN
 //
-// List of events the user has registered for, with status badges.
+// Events the user registered for, loaded from GET /events/my.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class MyEventsScreen extends StatelessWidget {
+class MyEventsScreen extends ConsumerWidget {
   const MyEventsScreen({super.key});
 
-  static const _events = [
-    _MyEvent('Worship Conference 2026', 'Sun, Feb 23 \u00b7 10:00 AM',
-        'Grace Cathedral', 'Upcoming', '3'),
-    _MyEvent('Youth Night', 'Sat, Feb 8 \u00b7 6:00 PM', 'Main Auditorium',
-        'Completed', '1'),
-    _MyEvent('Prayer Walk', 'Sat, Jan 25 \u00b7 7:00 AM', 'City Park',
-        'Completed', '5'),
-  ];
-
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final eventState = ref.watch(eventNotifierProvider);
+
+    // Trigger load if myEvents is empty
+    if (eventState.myEvents.isEmpty && !eventState.isLoading) {
+      Future.microtask(
+          () => ref.read(eventNotifierProvider.notifier).loadMyEvents());
+    }
+
+    if (eventState.isLoading && eventState.myEvents.isEmpty) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
+        appBar: AppFilledAppBar(title: 'My Events', showBack: true),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      appBar: AppFilledAppBar(
-        title: 'My Events',
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: Icon(Icons.arrow_back,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-        ),
-      ),
-      body: _events.isEmpty
+      appBar: AppFilledAppBar(title: 'My Events', showBack: true),
+      body: eventState.myEvents.isEmpty
           ? const AppEmptyState(
               icon: Icons.event_busy,
               title: 'No events yet',
@@ -44,24 +46,28 @@ class MyEventsScreen extends StatelessWidget {
             )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.sp4),
-              itemCount: _events.length,
-              separatorBuilder: (_, __) =>
+              itemCount: eventState.myEvents.length,
+              separatorBuilder: (_, i) =>
                   const SizedBox(height: AppSpacing.sp3),
-              itemBuilder: (_, i) =>
-                  _EventTile(event: _events[i], isDark: isDark),
+              itemBuilder: (_, i) => _EventTile(
+                event: eventState.myEvents[i],
+                isDark: isDark,
+              ),
             ),
     );
   }
 }
 
+// ── Tile ──────────────────────────────────────────────────────────────────────
+
 class _EventTile extends StatelessWidget {
   const _EventTile({required this.event, required this.isDark});
-  final _MyEvent event;
+  final Event event;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    final isUpcoming = event.status == 'Upcoming';
+    final isUpcoming = event.startDate.isAfter(DateTime.now());
 
     return AppTapAnimation(
       onTap: () => context.push('/events/${event.id}'),
@@ -107,7 +113,8 @@ class _EventTile extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${event.date}\n${event.location}',
+                    '${event.dateFormatted} · ${event.timeFormatted}'
+                    '${event.location != null ? '\n${event.location}' : ''}',
                     style: AppTextStyles.bodySmall.copyWith(
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -131,7 +138,7 @@ class _EventTile extends StatelessWidget {
                 borderRadius: AppRadius.borderRadiusFull,
               ),
               child: Text(
-                event.status,
+                isUpcoming ? 'Upcoming' : 'Completed',
                 style: AppTextStyles.labelSmall.copyWith(
                   color: isUpcoming
                       ? (isDark ? AppColors.primaryLight : AppColors.primary)
@@ -144,14 +151,4 @@ class _EventTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MyEvent {
-  const _MyEvent(
-      this.title, this.date, this.location, this.status, this.id);
-  final String title;
-  final String date;
-  final String location;
-  final String status;
-  final String id;
 }

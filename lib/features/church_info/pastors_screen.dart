@@ -22,21 +22,6 @@ class PastorsScreen extends ConsumerWidget {
     Color(0xFFDC2626),
   ];
 
-  static const _staticLeaders = [
-    _LeaderData(name: 'Pastor James Wilson', title: 'Senior Pastor', bio: 'Pastor James has served as Senior Pastor for over 15 years. His passion is teaching the Word of God with clarity and helping people discover their God-given purpose.', initial: 'JW', color: Color(0xFF1E40AF)),
-    _LeaderData(name: 'Pastor Rachel Adams', title: 'Associate Pastor', bio: 'Pastor Rachel oversees discipleship and pastoral care. She has a heart for building authentic community and mentoring the next generation.', initial: 'RA', color: Color(0xFF7C3AED)),
-    _LeaderData(name: 'Pastor Samuel Torres', title: 'Youth Pastor', bio: 'Pastor Sam is passionate about reaching young people with the Gospel. He leads our vibrant youth ministry with energy and purpose.', initial: 'ST', color: Color(0xFFEA580C)),
-    _LeaderData(name: 'Pastor Grace Okafor', title: 'Worship Pastor', bio: 'Pastor Grace leads our worship ministry with a deep desire to create spaces where people encounter God through music and praise.', initial: 'GO', color: Color(0xFF0891B2)),
-    _LeaderData(name: 'Pastor David Kim', title: 'Outreach Pastor', bio: 'Pastor David coordinates our local and global missions. He believes the church exists to be the hands and feet of Jesus in the world.', initial: 'DK', color: Color(0xFF059669)),
-  ];
-
-  static const _staticMinistryLeaders = [
-    _MinistryLeaderData(name: 'Marcus Johnson', ministry: "Men's Ministry", initial: 'MJ'),
-    _MinistryLeaderData(name: 'Angela Roberts', ministry: "Children's Ministry", initial: 'AR'),
-    _MinistryLeaderData(name: 'Tom Bradley', ministry: 'Community Outreach', initial: 'TB'),
-    _MinistryLeaderData(name: 'Victoria Lee', ministry: 'Administration', initial: 'VL'),
-    _MinistryLeaderData(name: 'Caleb Johnson', ministry: 'Media & Tech', initial: 'CJ'),
-  ];
 
   static String _initials(String name) {
     final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
@@ -68,11 +53,8 @@ class PastorsScreen extends ConsumerWidget {
       appBar: AppFilledAppBar(title: 'Pastors & Leadership', showBack: true),
       body: staffAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => _buildContent(_staticLeaders, _staticMinistryLeaders, isDark),
-        data: (staff) {
-          final leaders = staff.isEmpty ? _staticLeaders : _fromApi(staff);
-          return _buildContent(leaders, staff.isEmpty ? _staticMinistryLeaders : const [], isDark);
-        },
+        error: (_, _) => _buildContent(const [], const [], isDark),
+        data: (staff) => _buildContent(_fromApi(staff), const [], isDark),
       ),
     );
   }

@@ -3,29 +3,33 @@ import type { AuthRequest } from '../../middleware/auth';
 import { forumService } from './forum.service';
 import { ApiError } from '../../utils/apiError';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
 export async function getCategories(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await forumService.getCategories(req.user.churchId);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await forumService.getCategories(churchId);
     ApiResponse.success(res, result);
   } catch (error) { next(error); }
 }
 
 export async function getTrending(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await forumService.getTrending(req.user.churchId, req.user.id);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await forumService.getTrending(churchId, req.user!.id);
     ApiResponse.success(res, result);
   } catch (error) { next(error); }
 }
 
 export async function getRecent(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await forumService.getRecent(req.user.churchId, req.user.id, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await forumService.getRecent(churchId, req.user!.id, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }
@@ -48,8 +52,9 @@ export async function getThreadDetail(req: AuthRequest, res: Response, next: Nex
 
 export async function createThread(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await forumService.createThread(req.user.id, req.user.churchId, req.body);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await forumService.createThread(req.user!.id, churchId, req.body);
     ApiResponse.created(res, result, 'Thread created');
   } catch (error) { next(error); }
 }

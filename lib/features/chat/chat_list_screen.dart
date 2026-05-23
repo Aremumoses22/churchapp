@@ -208,50 +208,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sp2),
-
-          // ── Online now row ──────────────────────────────────────────
-          SizedBox(
-            height: 82,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: AppSpacing.sp4),
-              children: [
-                _OnlineAvatar(
-                  initials: 'PJ',
-                  name: 'Pastor James',
-                  color: const Color(0xFFF59E0B),
-                  isDark: isDark,
-                ),
-                _OnlineAvatar(
-                  initials: 'SM',
-                  name: 'Sarah M.',
-                  color: const Color(0xFF8B5CF6),
-                  isDark: isDark,
-                ),
-                _OnlineAvatar(
-                  initials: 'GL',
-                  name: 'Grace L.',
-                  color: const Color(0xFF3B82F6),
-                  isDark: isDark,
-                ),
-                _OnlineAvatar(
-                  initials: 'DK',
-                  name: 'David K.',
-                  color: const Color(0xFFEF4444),
-                  isDark: isDark,
-                ),
-                _OnlineAvatar(
-                  initials: 'MR',
-                  name: 'Michael R.',
-                  color: const Color(0xFF059669),
-                  isDark: isDark,
-                ),
-              ],
-            ),
-          ),
-
           AppDivider(),
 
           // ── Chat list ───────────────────────────────────────────────
@@ -271,8 +227,7 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
                         data: chats[i],
                         isDark: isDark,
                         onTap: () => context.push(
-                          AppRoutes.chatConversation
-                              .replaceAll(':id', chats[i].id),
+                          '${AppRoutes.chatConversation.replaceAll(':id', chats[i].id)}?name=${Uri.encodeComponent(chats[i].name)}',
                         ),
                         onLongPress: () =>
                             _showChatOptions(chats[i]),
@@ -363,75 +318,6 @@ class _ChatListScreenState extends ConsumerState<ChatListScreen> {
           ),
         );
       },
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ONLINE AVATAR
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class _OnlineAvatar extends StatelessWidget {
-  const _OnlineAvatar({
-    required this.initials,
-    required this.name,
-    required this.color,
-    required this.isDark,
-  });
-  final String initials;
-  final String name;
-  final Color color;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: AppSpacing.sp3),
-      child: Column(
-        children: [
-          Stack(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: color.withValues(alpha: 0.15),
-                child: Text(
-                  initials,
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: isDark ? AppColors.bgDark : Colors.white,
-                      width: 2,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            name.split(' ').first,
-            style: AppTextStyles.bodySmall.copyWith(
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondary,
-              fontSize: 11,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

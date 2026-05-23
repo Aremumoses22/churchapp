@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../../middleware/auth';
 import { kidsService } from './kids.service';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const kidsController = {
   async listChildren(req: AuthRequest, res: Response, next: NextFunction) {
@@ -29,7 +30,7 @@ export const kidsController = {
   async registerChild(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
 
       const child = await kidsService.registerChild(userId, churchId, req.body);
@@ -61,7 +62,7 @@ export const kidsController = {
 
   async listRooms(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const page = query.page ?? 1;

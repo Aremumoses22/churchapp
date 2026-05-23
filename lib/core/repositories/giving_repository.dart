@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:dio/dio.dart';
 
 import '../config/api_config.dart';
@@ -8,50 +6,18 @@ import '../models/giving.dart';
 import '../services/api_client.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// GIVING REPOSITORY
-//
-// Covers GET/POST /giving/* endpoints
-// See API_INTEGRATION_GUIDE.md § 10
+// GIVING REPOSITORY — talks to /giving/* endpoints
 // ──────────────────────────────────────────────────────────────────────────────
 
-abstract class GivingRepository {
-  // Legacy form helpers (kept for mock compatibility)
-  List<String> getFormCategories();
-  List<int> getAmountPresets();
-  List<SavedCard> getSavedCards();
-}
-
-class MockGivingRepository implements GivingRepository {
-  @override
-  List<String> getFormCategories() =>
-      const ['Tithe', 'Offering', 'Building Fund', 'Missions', 'Special Seed'];
-
-  @override
-  List<int> getAmountPresets() => const [1000, 5000, 10000, 50000];
-
-  @override
-  List<SavedCard> getSavedCards() => const [
-        SavedCard(brand: 'Visa', last4: '4532', color: Color(0xFF1A1F71)),
-        SavedCard(brand: 'Mastercard', last4: '8791', color: Color(0xFFEB001B)),
-      ];
-}
-
-// ── Real API repository ───────────────────────────────────────────────────────
-
-class ApiGivingRepository implements GivingRepository {
-  ApiGivingRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+class GivingRepository {
+  GivingRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
   final Dio _dio;
 
-  // Legacy helpers — returns empty list so UI can fallback to API providers
-  @override
-  List<String> getFormCategories() => [];
-  @override
-  List<int> getAmountPresets() => const [1000, 5000, 10000, 50000];
-  @override
-  List<SavedCard> getSavedCards() => [];
+  static const List<int> amountPresets = [1000, 5000, 10000, 50000];
 
   // ── Categories ────────────────────────────────────────────────────────────
+
   Future<ApiResponse<List<GivingCategory>>> getCategories() async {
     try {
       final res = await _dio.get(Endpoints.givingCategories);
@@ -70,6 +36,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Summary ───────────────────────────────────────────────────────────────
+
   Future<ApiResponse<GivingSummary>> getSummary() async {
     try {
       final res = await _dio.get(Endpoints.givingSummary);
@@ -83,6 +50,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Donate ────────────────────────────────────────────────────────────────
+
   Future<ApiResponse<Map<String, dynamic>>> donate({
     required double amount,
     required String categoryId,
@@ -96,9 +64,9 @@ class ApiGivingRepository implements GivingRepository {
         'amount': amount,
         'categoryId': categoryId,
         'paymentMethod': paymentMethod,
-        if (campaignId != null) 'campaignId': campaignId,
+        if (campaignId case final id?) 'campaignId': id,
         'isAnonymous': isAnonymous,
-        if (notes != null) 'notes': notes,
+        if (notes case final n?) 'notes': n,
       });
       return ApiResponse<Map<String, dynamic>>.fromJson(
         res.data as Map<String, dynamic>,
@@ -110,6 +78,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Verify ────────────────────────────────────────────────────────────────
+
   Future<ApiResponse<void>> verifyTransaction(String reference) async {
     try {
       final res = await _dio
@@ -121,6 +90,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── History ───────────────────────────────────────────────────────────────
+
   Future<PaginatedResponse<Donation>> getHistory({
     int page = 1,
     int limit = 20,
@@ -145,6 +115,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Payment Methods ───────────────────────────────────────────────────────
+
   Future<ApiResponse<List<PaymentMethod>>> getPaymentMethods() async {
     try {
       final res = await _dio.get(Endpoints.givingPaymentMethods);
@@ -164,8 +135,7 @@ class ApiGivingRepository implements GivingRepository {
 
   Future<ApiResponse<void>> deletePaymentMethod(String id) async {
     try {
-      final res =
-          await _dio.delete(Endpoints.givingPaymentMethod(id));
+      final res = await _dio.delete(Endpoints.givingPaymentMethod(id));
       return ApiResponse.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
       return _err(e);
@@ -173,6 +143,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Campaigns ─────────────────────────────────────────────────────────────
+
   Future<PaginatedResponse<GivingCampaign>> getCampaigns({
     int page = 1,
     int limit = 20,
@@ -209,6 +180,7 @@ class ApiGivingRepository implements GivingRepository {
   }
 
   // ── Pledges ───────────────────────────────────────────────────────────────
+
   Future<PaginatedResponse<Pledge>> getPledges({
     int page = 1,
     int limit = 20,
@@ -241,7 +213,7 @@ class ApiGivingRepository implements GivingRepository {
       final res = await _dio.post(Endpoints.givingPledges, data: {
         'campaignId': campaignId,
         'totalAmount': totalAmount,
-        if (endDate != null) 'endDate': endDate,
+        if (endDate case final d?) 'endDate': d,
       });
       return ApiResponse.fromJson(res.data as Map<String, dynamic>);
     } on DioException catch (e) {
@@ -274,7 +246,22 @@ class ApiGivingRepository implements GivingRepository {
     }
   }
 
+  // ── Receipts ──────────────────────────────────────────────────────────────
+
+  Future<ApiResponse<Donation>> getReceipt(String id) async {
+    try {
+      final res = await _dio.get(Endpoints.givingReceipt(id));
+      return ApiResponse<Donation>.fromJson(
+        res.data as Map<String, dynamic>,
+        fromJsonT: (d) => Donation.fromJson(d as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      return _err(e);
+    }
+  }
+
   // ── Recurring ─────────────────────────────────────────────────────────────
+
   Future<ApiResponse<List<RecurringDonation>>> getRecurring() async {
     try {
       final res = await _dio.get(Endpoints.givingRecurring);

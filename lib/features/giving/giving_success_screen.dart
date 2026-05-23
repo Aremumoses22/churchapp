@@ -14,7 +14,16 @@ import '../../shared/widgets/widgets.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 
 class GivingSuccessScreen extends StatefulWidget {
-  const GivingSuccessScreen({super.key});
+  const GivingSuccessScreen({
+    super.key,
+    this.amount,
+    this.reference,
+    this.category,
+  });
+
+  final double? amount;
+  final String? reference;
+  final String? category;
 
   @override
   State<GivingSuccessScreen> createState() => _GivingSuccessScreenState();
@@ -87,6 +96,16 @@ class _GivingSuccessScreenState extends State<GivingSuccessScreen>
     super.dispose();
   }
 
+  String _formatNaira(double amount) {
+    final str = amount.toInt().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buf.write(',');
+      buf.write(str[i]);
+    }
+    return '₦${buf.toString()}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -142,30 +161,35 @@ class _GivingSuccessScreenState extends State<GivingSuccessScreen>
                     ),
                     const SizedBox(height: AppSpacing.sp4),
 
-                    Text(
-                      '\u20A610,000',
-                      style: AppTextStyles.displayLarge.copyWith(
-                        color: isDark
-                            ? AppColors.primaryLight
-                            : AppColors.primary,
+                    if (widget.amount != null)
+                      Text(
+                        _formatNaira(widget.amount!),
+                        style: AppTextStyles.displayLarge.copyWith(
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sp2),
-                    Text(
-                      'Tithe',
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
+                    if (widget.category != null) ...[
+                      const SizedBox(height: AppSpacing.sp2),
+                      Text(
+                        widget.category!,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sp2),
-                    Text(
-                      'Ref: CH-20260223-4821',
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: AppColors.textDisabled,
+                    ],
+                    if (widget.reference?.isNotEmpty == true) ...[
+                      const SizedBox(height: AppSpacing.sp2),
+                      Text(
+                        'Ref: ${widget.reference}',
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textDisabled,
+                        ),
                       ),
-                    ),
+                    ],
 
                     const SizedBox(height: AppSpacing.sp8),
 

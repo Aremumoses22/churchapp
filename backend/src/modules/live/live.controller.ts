@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express';
 import { liveService } from './live.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import type { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
@@ -9,7 +10,7 @@ export const liveController = {
   // GET /live — list live services
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
 
       const page = parseInt(req.query.page as string) || 1;
@@ -26,7 +27,7 @@ export const liveController = {
   // GET /live/current — get current live service
   async getCurrent(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
 
       const current = await liveService.getCurrentLive(churchId);

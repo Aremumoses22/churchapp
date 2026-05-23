@@ -4,6 +4,7 @@ import { devotionalsService } from './devotionals.service';
 import { readingPlansService } from './readingPlans.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const bibleController = {
   // ════════════════════════════════════════════════════
@@ -78,7 +79,7 @@ export const bibleController = {
   // GET /bible/devotionals/today
   async getDevotionalToday(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const devotional = await devotionalsService.getToday(churchId, req.user!.id);
       ApiResponse.success(res, devotional);
@@ -90,7 +91,7 @@ export const bibleController = {
   // GET /bible/devotionals/:date
   async getDevotionalByDate(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const devotional = await devotionalsService.getByDate(churchId, req.user!.id, req.params.date as string);
       ApiResponse.success(res, devotional);
@@ -112,7 +113,7 @@ export const bibleController = {
   // GET /bible/devotionals/streak
   async getDevotionalStreak(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const streak = await devotionalsService.getStreak(req.user!.id, churchId);
       ApiResponse.success(res, streak);
@@ -128,7 +129,7 @@ export const bibleController = {
   // GET /bible/reading-plans
   async browseReadingPlans(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const plans = await readingPlansService.browse(churchId, req.query.category as string | undefined);
       ApiResponse.success(res, plans);

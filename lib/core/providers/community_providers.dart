@@ -8,28 +8,23 @@ import '../repositories/community_repository.dart';
 // COMMUNITY PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-final communityRepositoryProvider = Provider<MockCommunityRepository>((_) {
-  return MockCommunityRepository();
+final communityRepositoryProvider = Provider<CommunityRepository>((_) {
+  return CommunityRepository();
 });
 
-final apiCommunityRepositoryProvider = Provider<ApiCommunityRepository>((_) {
-  return ApiCommunityRepository();
-});
-
-// ── Groups API providers ──────────────────────────────────────────────────────
+// ── Groups ────────────────────────────────────────────────────────────────────
 
 final groupsProvider = FutureProvider<List<ConnectGroup>>((ref) async {
-  final res = await ref
-      .watch(apiCommunityRepositoryProvider)
-      .getGroupsPaginated();
+  final res = await ref.watch(communityRepositoryProvider).getGroupsPaginated();
+  if (!res.success) throw Exception(res.message);
   return res.data;
 });
 
 final groupDetailProvider =
     FutureProvider.family<GroupDetail?, String>((ref, id) async {
-  final res =
-      await ref.watch(apiCommunityRepositoryProvider).getGroup(id);
-  return res.success ? res.data : null;
+  final res = await ref.watch(communityRepositoryProvider).getGroup(id);
+  if (!res.success) throw Exception(res.message);
+  return res.data;
 });
 
 // ── Group membership notifier ─────────────────────────────────────────────────
@@ -37,46 +32,54 @@ final groupDetailProvider =
 class GroupMembershipNotifier extends StateNotifier<bool> {
   GroupMembershipNotifier(this._repo, this._groupId) : super(false);
 
-  final ApiCommunityRepository _repo;
+  final CommunityRepository _repo;
   final String _groupId;
 
   Future<void> join() async {
     final res = await _repo.joinGroup(_groupId);
-    if (res.success) state = true;
+    if (res.success && mounted) state = true;
   }
 
   Future<void> leave() async {
     final res = await _repo.leaveGroup(_groupId);
-    if (res.success) state = false;
+    if (res.success && mounted) state = false;
   }
 }
 
 final groupMembershipProvider =
     StateNotifierProvider.family<GroupMembershipNotifier, bool, String>(
   (ref, groupId) => GroupMembershipNotifier(
-    ref.read(apiCommunityRepositoryProvider),
+    ref.read(communityRepositoryProvider),
     groupId,
   ),
 );
 
 // ── Announcements ─────────────────────────────────────────────────────────────
 
+final announcementsFutureProvider =
+    FutureProvider<List<Announcement>>((ref) async {
+  final res = await ref.watch(communityRepositoryProvider).getAnnouncements();
+  if (!res.success) throw Exception(res.message);
+  return res.data;
+});
+
 class AnnouncementsNotifier extends Notifier<List<Announcement>> {
   @override
-  List<Announcement> build() => [];
-
-  Future<void> load() async {
-    final res = await ref
-        .read(apiCommunityRepositoryProvider)
-        .getAnnouncements();
-    state = res.data;
+  List<Announcement> build() {
+    Future.microtask(_load);
+    return [];
   }
 
+  Future<void> _load() async {
+    final res = await ref.read(communityRepositoryProvider).getAnnouncements();
+    if (res.success) state = res.data;
+  }
+
+  Future<void> refresh() => _load();
+
   Future<void> markRead(String id) async {
-    await ref.read(apiCommunityRepositoryProvider).markAnnouncementRead(id);
-    state = state
-        .map((a) => a.id == id ? a.copyWith(isRead: true) : a)
-        .toList();
+    await ref.read(communityRepositoryProvider).markAnnouncementRead(id);
+    state = state.map((a) => a.id == id ? a.copyWith(isRead: true) : a).toList();
   }
 }
 
@@ -85,29 +88,31 @@ final announcementsProvider =
   AnnouncementsNotifier.new,
 );
 
-final announcementsFutureProvider =
-    FutureProvider<List<Announcement>>((ref) async {
-  final res = await ref
-      .watch(apiCommunityRepositoryProvider)
-      .getAnnouncements();
+// ── Testimonies ───────────────────────────────────────────────────────────────
+
+final testimoniesFutureProvider =
+    FutureProvider<List<Testimony>>((ref) async {
+  final res = await ref.watch(communityRepositoryProvider).getTestimonies();
+  if (!res.success) throw Exception(res.message);
   return res.data;
 });
 
-// ── Testimonies ───────────────────────────────────────────────────────────────
-
 class TestimoniesNotifier extends Notifier<List<Testimony>> {
   @override
-  List<Testimony> build() => [];
-
-  Future<void> load() async {
-    final res = await ref
-        .read(apiCommunityRepositoryProvider)
-        .getTestimonies();
-    state = res.data;
+  List<Testimony> build() {
+    Future.microtask(_load);
+    return [];
   }
 
+  Future<void> _load() async {
+    final res = await ref.read(communityRepositoryProvider).getTestimonies();
+    if (res.success) state = res.data;
+  }
+
+  Future<void> refresh() => _load();
+
   Future<void> react(String id, String type) async {
-    await ref.read(apiCommunityRepositoryProvider).reactTestimony(id, type);
+    await ref.read(communityRepositoryProvider).reactTestimony(id, type);
     state = state.map((t) {
       if (t.id != id) return t;
       if (type == 'LIKE') {
@@ -129,7 +134,7 @@ class TestimoniesNotifier extends Notifier<List<Testimony>> {
     required String content,
     bool isAnonymous = false,
   }) async {
-    final res = await ref.read(apiCommunityRepositoryProvider).submitTestimony(
+    final res = await ref.read(communityRepositoryProvider).submitTestimony(
           title: title,
           content: content,
           isAnonymous: isAnonymous,
@@ -143,19 +148,11 @@ final testimoniesProvider =
   TestimoniesNotifier.new,
 );
 
-final testimoniesFutureProvider =
-    FutureProvider<List<Testimony>>((ref) async {
-  final res = await ref
-      .watch(apiCommunityRepositoryProvider)
-      .getTestimonies();
-  return res.data;
-});
-
 // ── Directory ─────────────────────────────────────────────────────────────────
 
 final directoryProvider = FutureProvider<List<DirectoryMember>>((ref) async {
-  final res =
-      await ref.watch(apiCommunityRepositoryProvider).getDirectory();
+  final res = await ref.watch(communityRepositoryProvider).getDirectory();
+  if (!res.success) throw Exception(res.message);
   return res.data;
 });
 
@@ -166,8 +163,7 @@ class InviteNotifier extends Notifier<InviteInfo?> {
   InviteInfo? build() => null;
 
   Future<bool> generate() async {
-    final res =
-        await ref.read(apiCommunityRepositoryProvider).generateInvite();
+    final res = await ref.read(communityRepositoryProvider).generateInvite();
     if (res.success && res.data != null) {
       state = res.data;
       return true;
@@ -181,70 +177,38 @@ final inviteProvider = NotifierProvider<InviteNotifier, InviteInfo?>(
 );
 
 final inviteStatsProvider = FutureProvider<InviteStats?>((ref) async {
-  final res =
-      await ref.watch(apiCommunityRepositoryProvider).getInviteStats();
+  final res = await ref.watch(communityRepositoryProvider).getInviteStats();
   return res.success ? res.data : null;
 });
 
-// ── Legacy local state (Connect Groups screen fallback) ───────────────────────
+// ── Connect Groups filter state ───────────────────────────────────────────────
 
-class CommunityState {
-  const CommunityState({
-    this.groups = const [],
-    this.categories = const [],
+class ConnectGroupsState {
+  const ConnectGroupsState({
     this.selectedCategory = 0,
+    this.searchQuery = '',
   });
 
-  final List<ConnectGroup> groups;
-  final List<String> categories;
   final int selectedCategory;
+  final String searchQuery;
 
-  CommunityState copyWith({
-    List<ConnectGroup>? groups,
-    List<String>? categories,
-    int? selectedCategory,
-  }) {
-    return CommunityState(
-      groups: groups ?? this.groups,
-      categories: categories ?? this.categories,
+  ConnectGroupsState copyWith({int? selectedCategory, String? searchQuery}) {
+    return ConnectGroupsState(
       selectedCategory: selectedCategory ?? this.selectedCategory,
+      searchQuery: searchQuery ?? this.searchQuery,
     );
-  }
-
-  List<ConnectGroup> get filteredGroups {
-    if (selectedCategory == 0) return groups;
-    final cat = categories[selectedCategory];
-    return groups
-        .where((g) =>
-            g.category.toLowerCase() == cat.toLowerCase() ||
-            g.category.toUpperCase() ==
-                cat.toUpperCase().replaceAll(' ', '_'))
-        .toList();
   }
 }
 
-class CommunityNotifier extends StateNotifier<CommunityState> {
-  CommunityNotifier(this._repo) : super(const CommunityState()) {
-    _init();
-  }
-  final MockCommunityRepository _repo;
-
-  void _init() {
-    state = state.copyWith(
-      groups: _repo.getGroups(),
-      categories: _repo.getCategories(),
-    );
-  }
+class ConnectGroupsNotifier extends StateNotifier<ConnectGroupsState> {
+  ConnectGroupsNotifier() : super(const ConnectGroupsState());
 
   void selectCategory(int index) =>
       state = state.copyWith(selectedCategory: index);
 
-  void updateGroupsFromApi(List<ConnectGroup> apiGroups) {
-    state = state.copyWith(groups: apiGroups);
-  }
+  void setSearchQuery(String q) => state = state.copyWith(searchQuery: q);
 }
 
-final communityNotifierProvider =
-    StateNotifierProvider<CommunityNotifier, CommunityState>((ref) {
-  return CommunityNotifier(ref.watch(communityRepositoryProvider));
-});
+final connectGroupsNotifierProvider =
+    StateNotifierProvider<ConnectGroupsNotifier, ConnectGroupsState>(
+        (_) => ConnectGroupsNotifier());

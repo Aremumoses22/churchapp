@@ -8,68 +8,75 @@ import '../repositories/giving_repository.dart';
 // GIVING PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-final givingRepositoryProvider = Provider<MockGivingRepository>((_) {
-  return MockGivingRepository();
-});
-
-final apiGivingRepositoryProvider = Provider<ApiGivingRepository>((_) {
-  return ApiGivingRepository();
+final givingRepositoryProvider = Provider<GivingRepository>((_) {
+  return GivingRepository();
 });
 
 // ── API async providers ───────────────────────────────────────────────────────
 
 final givingCategoriesProvider =
     FutureProvider<List<GivingCategory>>((ref) async {
-  final res =
-      await ref.watch(apiGivingRepositoryProvider).getCategories();
+  final res = await ref.watch(givingRepositoryProvider).getCategories();
+  if (!res.success) throw Exception(res.message);
   return res.data ?? [];
 });
 
 final givingSummaryProvider = FutureProvider<GivingSummary?>((ref) async {
-  final res = await ref.watch(apiGivingRepositoryProvider).getSummary();
+  final res = await ref.watch(givingRepositoryProvider).getSummary();
   return res.success ? res.data : null;
 });
 
 final givingCampaignsProvider =
     FutureProvider<List<GivingCampaign>>((ref) async {
-  final res =
-      await ref.watch(apiGivingRepositoryProvider).getCampaigns();
+  final res = await ref.watch(givingRepositoryProvider).getCampaigns();
+  if (!res.success) throw Exception(res.message);
   return res.data;
 });
 
 final givingCampaignProvider =
     FutureProvider.family<GivingCampaign?, String>((ref, id) async {
-  final res =
-      await ref.watch(apiGivingRepositoryProvider).getCampaign(id);
-  return res.success ? res.data : null;
+  final res = await ref.watch(givingRepositoryProvider).getCampaign(id);
+  if (!res.success) throw Exception(res.message);
+  return res.data;
 });
 
 final givingPledgesProvider = FutureProvider<List<Pledge>>((ref) async {
-  final res = await ref.watch(apiGivingRepositoryProvider).getPledges();
+  final res = await ref.watch(givingRepositoryProvider).getPledges();
+  if (!res.success) throw Exception(res.message);
   return res.data;
 });
 
 final givingPaymentMethodsProvider =
     FutureProvider<List<PaymentMethod>>((ref) async {
-  final res =
-      await ref.watch(apiGivingRepositoryProvider).getPaymentMethods();
+  final res = await ref.watch(givingRepositoryProvider).getPaymentMethods();
+  if (!res.success) throw Exception(res.message);
   return res.data ?? [];
 });
 
 final givingRecurringProvider =
     FutureProvider<List<RecurringDonation>>((ref) async {
-  final res = await ref.watch(apiGivingRepositoryProvider).getRecurring();
+  final res = await ref.watch(givingRepositoryProvider).getRecurring();
+  if (!res.success) throw Exception(res.message);
   return res.data ?? [];
 });
 
-// ── Form state (local UI) ─────────────────────────────────────────────────────
+final givingHistoryProvider = FutureProvider<List<Donation>>((ref) async {
+  final res = await ref.watch(givingRepositoryProvider).getHistory();
+  if (!res.success) throw Exception(res.message);
+  return res.data;
+});
+
+final givingReceiptProvider =
+    FutureProvider.family<Donation?, String>((ref, id) async {
+  final res = await ref.watch(givingRepositoryProvider).getReceipt(id);
+  return res.success ? res.data : null;
+});
+
+// ── Giving form state (local UI only) ────────────────────────────────────────
 
 class GivingState {
   const GivingState({
-    this.categories = const [],
-    this.amountPresets = const [],
-    this.savedCards = const [],
-    this.selectedCategory = 0,
+    this.selectedCategoryIndex = 0,
     this.selectedAmount,
     this.isCustom = false,
     this.customAmount = '',
@@ -79,10 +86,7 @@ class GivingState {
     this.reminderFrequency = 0,
   });
 
-  final List<String> categories;
-  final List<int> amountPresets;
-  final List<SavedCard> savedCards;
-  final int selectedCategory;
+  final int selectedCategoryIndex;
   final int? selectedAmount;
   final bool isCustom;
   final String customAmount;
@@ -97,10 +101,7 @@ class GivingState {
   }
 
   GivingState copyWith({
-    List<String>? categories,
-    List<int>? amountPresets,
-    List<SavedCard>? savedCards,
-    int? selectedCategory,
+    int? selectedCategoryIndex,
     int? selectedAmount,
     bool clearSelectedAmount = false,
     bool? isCustom,
@@ -111,10 +112,8 @@ class GivingState {
     int? reminderFrequency,
   }) {
     return GivingState(
-      categories: categories ?? this.categories,
-      amountPresets: amountPresets ?? this.amountPresets,
-      savedCards: savedCards ?? this.savedCards,
-      selectedCategory: selectedCategory ?? this.selectedCategory,
+      selectedCategoryIndex:
+          selectedCategoryIndex ?? this.selectedCategoryIndex,
       selectedAmount: clearSelectedAmount
           ? null
           : (selectedAmount ?? this.selectedAmount),
@@ -129,21 +128,10 @@ class GivingState {
 }
 
 class GivingNotifier extends StateNotifier<GivingState> {
-  GivingNotifier(this._repo) : super(const GivingState()) {
-    _init();
-  }
-  final MockGivingRepository _repo;
-
-  void _init() {
-    state = state.copyWith(
-      categories: _repo.getFormCategories(),
-      amountPresets: _repo.getAmountPresets(),
-      savedCards: _repo.getSavedCards(),
-    );
-  }
+  GivingNotifier() : super(const GivingState());
 
   void selectCategory(int index) =>
-      state = state.copyWith(selectedCategory: index);
+      state = state.copyWith(selectedCategoryIndex: index);
 
   void selectAmount(int amount) => state = state.copyWith(
         selectedAmount: amount,
@@ -166,20 +154,8 @@ class GivingNotifier extends StateNotifier<GivingState> {
   void setReminderFrequency(int f) =>
       state = state.copyWith(reminderFrequency: f);
 
-  void updateCategoriesFromApi(List<GivingCategory> apiCats) {
-    state = state.copyWith(
-      categories: apiCats.map((c) => c.name).toList(),
-    );
-  }
-
-  void reset() => state = GivingState(
-        categories: _repo.getFormCategories(),
-        amountPresets: _repo.getAmountPresets(),
-        savedCards: _repo.getSavedCards(),
-      );
+  void reset() => state = const GivingState();
 }
 
 final givingNotifierProvider =
-    StateNotifierProvider<GivingNotifier, GivingState>((ref) {
-  return GivingNotifier(ref.watch(givingRepositoryProvider));
-});
+    StateNotifierProvider<GivingNotifier, GivingState>((_) => GivingNotifier());

@@ -24,6 +24,7 @@ export const churchService = {
         logoUrl: true,
         coverImageUrl: true,
         socialLinks: true,
+        settings: true,
       },
     });
 
@@ -35,7 +36,11 @@ export const churchService = {
       select: { id: true, title: true, description: true, iconUrl: true },
     });
 
-    return { ...church, coreValues };
+    const settings = (church.settings as Record<string, unknown>) || {};
+    const timeline = (settings.timeline as Array<{ year: string; title: string; description: string }>) || [];
+    const { settings: _settings, ...churchFields } = church;
+
+    return { ...churchFields, coreValues, timeline };
   },
 
   // ────────────────────────────────────────────────────

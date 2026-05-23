@@ -1,94 +1,104 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/models/prayer.dart';
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // PRAYER REQUESTS SCREEN
 //
-// List of user's submitted prayer requests with visibility badges,
-// prayer counts, and status.
+// User's submitted prayer requests loaded from GET /prayer-requests/my.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class PrayerRequestsScreen extends StatelessWidget {
+class PrayerRequestsScreen extends ConsumerWidget {
   const PrayerRequestsScreen({super.key});
 
-  static const _requests = [
-    _PrayerItem('Healing for my mother', 'Please pray for her recovery.',
-        'Public', 12, '2 hours ago'),
-    _PrayerItem('Job provision', 'Trusting God for open doors.', 'Private', 0,
-        'Yesterday'),
-    _PrayerItem('Family peace', 'Praying for unity and love.', 'Public', 8,
-        '3 days ago'),
-    _PrayerItem('Guidance for decision', '', 'Private', 0, '1 week ago'),
-  ];
+  String _timeAgo(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays >= 7) return '${diff.inDays ~/ 7}w ago';
+      if (diff.inDays >= 1) return '${diff.inDays}d ago';
+      if (diff.inHours >= 1) return '${diff.inHours}h ago';
+      return '${diff.inMinutes}m ago';
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final requests = ref.watch(prayerRequestsProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
       appBar: AppFilledAppBar(
         title: 'Prayer Requests',
-        leading: IconButton(
-          onPressed: () => context.pop(),
-          icon: Icon(Icons.arrow_back,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary),
-        ),
+        showBack: true,
       ),
-      body: _requests.isEmpty
+      body: requests.isEmpty
           ? const AppEmptyState(
               icon: Icons.favorite_border,
               title: 'No prayer requests yet',
-              subtitle:
-                  'Share your heart \u2014 your church is here for you.',
+              subtitle: 'Share your heart — your church is here for you.',
             )
           : ListView.separated(
               padding: const EdgeInsets.all(AppSpacing.sp4),
-              itemCount: _requests.length,
-              separatorBuilder: (_, __) =>
+              itemCount: requests.length,
+              separatorBuilder: (_, i) =>
                   const SizedBox(height: AppSpacing.sp3),
-              itemBuilder: (_, i) =>
-                  _PrayerTile(item: _requests[i], isDark: isDark),
+              itemBuilder: (_, i) => _PrayerTile(
+                request: requests[i],
+                isDark: isDark,
+                timeAgo: _timeAgo(requests[i].createdAt),
+                onPray: () => ref
+                    .read(prayerRequestsProvider.notifier)
+                    .prayFor(requests[i].id),
+              ),
             ),
     );
   }
 }
 
+// ── Tile ──────────────────────────────────────────────────────────────────────
+
 class _PrayerTile extends StatelessWidget {
-  const _PrayerTile({required this.item, required this.isDark});
-  final _PrayerItem item;
+  const _PrayerTile({
+    required this.request,
+    required this.isDark,
+    required this.timeAgo,
+    required this.onPray,
+  });
+
+  final PrayerRequest request;
   final bool isDark;
+  final String timeAgo;
+  final VoidCallback onPray;
 
   @override
   Widget build(BuildContext context) {
-    final isPublic = item.visibility == 'Public';
-
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header row
           Row(
             children: [
               Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.gold.withValues(alpha: 0.15)
-                      : AppColors.gold.withValues(alpha: 0.1),
+                  color: AppColors.gold.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.favorite,
-                    size: 18, color: AppColors.gold),
+                child: const Icon(Icons.favorite, size: 18, color: AppColors.gold),
               ),
               const SizedBox(width: AppSpacing.sp3),
               Expanded(
                 child: Text(
-                  item.title,
+                  request.title,
                   style: AppTextStyles.bodyLargeSemiBold.copyWith(
                     color: isDark
                         ? AppColors.textPrimaryDark
@@ -100,7 +110,7 @@ class _PrayerTile extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: isPublic
+                  color: request.isPublic
                       ? (isDark
                           ? AppColors.primaryLight.withValues(alpha: 0.15)
                           : AppColors.skyLight)
@@ -113,7 +123,7 @@ class _PrayerTile extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      isPublic ? Icons.lock_open : Icons.lock,
+                      request.isPublic ? Icons.lock_open : Icons.lock,
                       size: 12,
                       color: isDark
                           ? AppColors.textSecondaryDark
@@ -121,7 +131,7 @@ class _PrayerTile extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      item.visibility,
+                      request.isPublic ? 'Public' : 'Private',
                       style: AppTextStyles.labelSmall.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -133,11 +143,10 @@ class _PrayerTile extends StatelessWidget {
               ),
             ],
           ),
-
-          if (item.details.isNotEmpty) ...[
+          if (request.details != null && request.details!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sp2),
             Text(
-              item.details,
+              request.details!,
               style: AppTextStyles.bodyMedium.copyWith(
                 color: isDark
                     ? AppColors.textSecondaryDark
@@ -145,13 +154,10 @@ class _PrayerTile extends StatelessWidget {
               ),
             ),
           ],
-
           const SizedBox(height: AppSpacing.sp3),
-
-          // Footer
           Row(
             children: [
-              if (item.prayerCount > 0) ...[
+              if (request.prayerCount > 0) ...[
                 Icon(Icons.people_outline,
                     size: 14,
                     color: isDark
@@ -159,7 +165,7 @@ class _PrayerTile extends StatelessWidget {
                         : AppColors.primary),
                 const SizedBox(width: 4),
                 Text(
-                  '${item.prayerCount} praying',
+                  '${request.prayerCount} praying',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: isDark
                         ? AppColors.primaryLight
@@ -168,31 +174,40 @@ class _PrayerTile extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSpacing.sp4),
               ],
-              Text(
-                item.timeAgo,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: AppColors.textDisabled,
+              if (timeAgo.isNotEmpty)
+                Text(
+                  timeAgo,
+                  style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.textDisabled,
+                  ),
                 ),
-              ),
+              const Spacer(),
+              if (!request.hasPrayed)
+                GestureDetector(
+                  onTap: onPray,
+                  child: Row(
+                    children: [
+                      Icon(Icons.favorite_border,
+                          size: 16,
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Pray',
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
         ],
       ),
     );
   }
-}
-
-class _PrayerItem {
-  const _PrayerItem(
-    this.title,
-    this.details,
-    this.visibility,
-    this.prayerCount,
-    this.timeAgo,
-  );
-  final String title;
-  final String details;
-  final String visibility;
-  final int prayerCount;
-  final String timeAgo;
 }

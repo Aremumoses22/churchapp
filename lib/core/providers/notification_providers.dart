@@ -9,9 +9,7 @@ import '../repositories/notification_repository.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 
 final notificationRepositoryProvider =
-    Provider<NotificationRepository>((_) {
-  return MockNotificationRepository();
-});
+    Provider<NotificationRepository>((_) => NotificationRepository());
 
 // ── State ────────────────────────────────────────────────────────────────────
 
@@ -19,26 +17,29 @@ class NotificationState {
   const NotificationState({
     this.notifications = const [],
     this.filterIndex = 0,
-    this.filterLabels = const [],
-    this.groupOrder = const [],
+    this.isLoading = false,
+    this.error,
   });
 
   final List<AppNotification> notifications;
   final int filterIndex;
-  final List<String> filterLabels;
-  final List<String> groupOrder;
+  final bool isLoading;
+  final String? error;
+
+  List<String> get filterLabels => NotificationRepository.filterLabels;
+  List<String> get groupOrder => NotificationRepository.groupOrder;
 
   NotificationState copyWith({
     List<AppNotification>? notifications,
     int? filterIndex,
-    List<String>? filterLabels,
-    List<String>? groupOrder,
+    bool? isLoading,
+    String? error,
   }) {
     return NotificationState(
       notifications: notifications ?? this.notifications,
       filterIndex: filterIndex ?? this.filterIndex,
-      filterLabels: filterLabels ?? this.filterLabels,
-      groupOrder: groupOrder ?? this.groupOrder,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
     );
   }
 
@@ -83,39 +84,46 @@ class NotificationState {
 
 class NotificationNotifier extends StateNotifier<NotificationState> {
   NotificationNotifier(this._repo) : super(const NotificationState()) {
-    _init();
+    _load();
   }
   final NotificationRepository _repo;
 
-  void _init() {
-    state = state.copyWith(
-      notifications: _repo.getNotifications(),
-      filterLabels: _repo.filterLabels,
-      groupOrder: _repo.groupOrder,
-    );
+  Future<void> _load() async {
+    state = state.copyWith(isLoading: true, error: null);
+    final res = await _repo.getNotifications();
+    if (!mounted) return;
+    if (res.success) {
+      state = state.copyWith(isLoading: false, notifications: res.data);
+    } else {
+      state = state.copyWith(isLoading: false, error: res.message);
+    }
   }
+
+  Future<void> refresh() => _load();
 
   void setFilter(int index) => state = state.copyWith(filterIndex: index);
 
-  void markAsRead(String id) {
+  Future<void> markAsRead(String id) async {
     final updated = state.notifications.map((n) {
       if (n.id == id) return n.copyWith(isRead: true);
       return n;
     }).toList();
     state = state.copyWith(notifications: updated);
+    await _repo.markAsRead(id);
   }
 
-  void markAllAsRead() {
-    final updated = state.notifications
-        .map((n) => n.copyWith(isRead: true))
-        .toList();
+  Future<void> markAllAsRead() async {
+    final updated =
+        state.notifications.map((n) => n.copyWith(isRead: true)).toList();
     state = state.copyWith(notifications: updated);
+    await _repo.markAllRead();
   }
 
   void dismiss(String id) {
     state = state.copyWith(
       notifications: state.notifications.where((n) => n.id != id).toList(),
     );
+    _repo.deleteNotification(id);
   }
 
   void undoDismiss(AppNotification notification, int index) {

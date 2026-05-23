@@ -2,99 +2,35 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/bible.dart';
+import '../../core/providers/bible_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // READING PLAN SCREEN
-//
-// Browse reading plans (e.g., "21 Days of Faith"), progress ring,
-// daily checklist, community participation count.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class ReadingPlanScreen extends StatefulWidget {
+class ReadingPlanScreen extends ConsumerStatefulWidget {
   const ReadingPlanScreen({super.key});
 
   @override
-  State<ReadingPlanScreen> createState() => _ReadingPlanScreenState();
+  ConsumerState<ReadingPlanScreen> createState() => _ReadingPlanScreenState();
 }
 
-class _ReadingPlanScreenState extends State<ReadingPlanScreen> {
+class _ReadingPlanScreenState extends ConsumerState<ReadingPlanScreen> {
   int _selectedTabIndex = 0; // 0 = My Plans, 1 = Browse
 
-  // ── Mock data ──────────────────────────────────────────────────────────────
-  final _myPlans = [
-    _PlanData(
-      title: '21 Days of Faith',
-      description: 'A journey through the heroes of faith in Hebrews 11',
-      progress: 14,
-      totalDays: 21,
-      participants: 1247,
-      imageColor: const Color(0xFF1E3A8A),
-      isActive: true,
-      todayReading: 'Hebrews 11:23-31',
-      todayTitle: 'Day 14: The Faith of Moses',
-    ),
-    _PlanData(
-      title: 'Psalms of Comfort',
-      description: 'Find peace and rest in the Psalms',
-      progress: 5,
-      totalDays: 30,
-      participants: 893,
-      imageColor: const Color(0xFF059669),
-      isActive: true,
-      todayReading: 'Psalm 27:1-14',
-      todayTitle: 'Day 5: The Lord is My Light',
-    ),
-  ];
-
-  final _browsePlans = [
-    _PlanData(
-      title: 'The Sermon on the Mount',
-      description: 'Explore Jesus\' most famous teachings over 14 days',
-      progress: 0,
-      totalDays: 14,
-      participants: 3421,
-      imageColor: const Color(0xFF7C3AED),
-      isActive: false,
-    ),
-    _PlanData(
-      title: 'Proverbs: Wisdom for Life',
-      description: 'One chapter of Proverbs each day for 31 days',
-      progress: 0,
-      totalDays: 31,
-      participants: 2156,
-      imageColor: const Color(0xFFDC2626),
-      isActive: false,
-    ),
-    _PlanData(
-      title: 'Letters of Paul',
-      description: 'Journey through Paul\'s epistles to the early church',
-      progress: 0,
-      totalDays: 60,
-      participants: 1834,
-      imageColor: const Color(0xFF0891B2),
-      isActive: false,
-    ),
-    _PlanData(
-      title: 'Genesis: In the Beginning',
-      description: 'Discover God\'s creation story and covenant promises',
-      progress: 0,
-      totalDays: 45,
-      participants: 1502,
-      imageColor: const Color(0xFFB45309),
-      isActive: false,
-    ),
-    _PlanData(
-      title: 'Advent Devotional',
-      description: 'Prepare your heart for Christmas in 25 days',
-      progress: 0,
-      totalDays: 25,
-      participants: 4210,
-      imageColor: const Color(0xFF9F1239),
-      isActive: false,
-    ),
+  static const _kColors = [
+    Color(0xFF1E3A8A),
+    Color(0xFF059669),
+    Color(0xFF7C3AED),
+    Color(0xFFDC2626),
+    Color(0xFF0891B2),
+    Color(0xFFB45309),
+    Color(0xFF9F1239),
   ];
 
   @override
@@ -103,13 +39,10 @@ class _ReadingPlanScreenState extends State<ReadingPlanScreen> {
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      appBar: AppFilledAppBar(
-        title: 'Reading Plans',
-        showBack: true,
-      ),
+      appBar: AppFilledAppBar(title: 'Reading Plans', showBack: true),
       body: Column(
         children: [
-          // ── Tab Switcher ─────────────────────────────────────────────────
+          // ── Tab Switcher ───────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.screenHorizontalPadding,
@@ -140,7 +73,7 @@ class _ReadingPlanScreenState extends State<ReadingPlanScreen> {
             ),
           ),
 
-          // ── Content ──────────────────────────────────────────────────────
+          // ── Content ────────────────────────────────────────────────────────
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
@@ -154,11 +87,14 @@ class _ReadingPlanScreenState extends State<ReadingPlanScreen> {
     );
   }
 
-  // ── My Plans Tab ──────────────────────────────────────────────────────────
+  // ── My Plans Tab ────────────────────────────────────────────────────────────
 
   Widget _buildMyPlans(bool isDark) {
-    if (_myPlans.isEmpty) {
-      return Center(
+    final myPlansAsync = ref.watch(myReadingPlansProvider);
+
+    return myPlansAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => Center(
         child: AppEmptyState(
           icon: Icons.menu_book_outlined,
           title: 'No Active Plans',
@@ -166,82 +102,95 @@ class _ReadingPlanScreenState extends State<ReadingPlanScreen> {
           buttonLabel: 'Browse Plans',
           onButtonPressed: () => setState(() => _selectedTabIndex = 1),
         ),
-      );
-    }
-
-    return ListView(
-      key: const ValueKey('my-plans'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.screenHorizontalPadding,
       ),
-      children: [
-        ..._myPlans.map((plan) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sp4),
-              child: _ActivePlanCard(plan: plan, isDark: isDark),
-            )),
-        const SizedBox(height: AppSpacing.sp4),
-        // Today's checklist for the first active plan
-        _TodayChecklist(plan: _myPlans.first, isDark: isDark),
-        const SizedBox(height: AppSpacing.sp12),
-      ],
+      data: (myPlans) {
+        if (myPlans.isEmpty) {
+          return Center(
+            child: AppEmptyState(
+              icon: Icons.menu_book_outlined,
+              title: 'No Active Plans',
+              subtitle: 'Browse reading plans to start your journey',
+              buttonLabel: 'Browse Plans',
+              onButtonPressed: () => setState(() => _selectedTabIndex = 1),
+            ),
+          );
+        }
+
+        return ListView(
+          key: const ValueKey('my-plans'),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontalPadding,
+          ),
+          children: [
+            ...myPlans.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sp4),
+                  child: _ActivePlanCard(
+                    userPlan: e.value,
+                    color: _kColors[e.key % _kColors.length],
+                    isDark: isDark,
+                  ),
+                )),
+            const SizedBox(height: AppSpacing.sp4),
+            _TodayChecklist(userPlan: myPlans.first, isDark: isDark),
+            const SizedBox(height: AppSpacing.sp12),
+          ],
+        );
+      },
     );
   }
 
-  // ── Browse Plans Tab ──────────────────────────────────────────────────────
+  // ── Browse Plans Tab ────────────────────────────────────────────────────────
 
   Widget _buildBrowsePlans(bool isDark) {
-    return ListView(
-      key: const ValueKey('browse-plans'),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.screenHorizontalPadding,
-      ),
-      children: [
-        Text(
-          'Popular Plans',
-          style: AppTextStyles.headingMedium.copyWith(
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
-          ),
+    final plansAsync = ref.watch(readingPlansProvider);
+
+    return plansAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, _) => Center(
+        child: AppEmptyState(
+          icon: Icons.menu_book_outlined,
+          title: 'No Plans Available',
+          subtitle: 'Check back soon for reading plans.',
         ),
-        const SizedBox(height: AppSpacing.sp4),
-        ..._browsePlans.map((plan) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
-              child: _BrowsePlanCard(plan: plan, isDark: isDark),
-            )),
-        const SizedBox(height: AppSpacing.sp12),
-      ],
+      ),
+      data: (plans) {
+        if (plans.isEmpty) {
+          return Center(
+            child: AppEmptyState(
+              icon: Icons.menu_book_outlined,
+              title: 'No Plans Available',
+              subtitle: 'Check back soon for reading plans.',
+            ),
+          );
+        }
+
+        return ListView(
+          key: const ValueKey('browse-plans'),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenHorizontalPadding,
+          ),
+          children: [
+            Text(
+              'Popular Plans',
+              style: AppTextStyles.headingMedium.copyWith(
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sp4),
+            ...plans.asMap().entries.map((e) => Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
+                  child: _BrowsePlanCard(
+                    plan: e.value,
+                    color: _kColors[e.key % _kColors.length],
+                    isDark: isDark,
+                  ),
+                )),
+            const SizedBox(height: AppSpacing.sp12),
+          ],
+        );
+      },
     );
   }
-}
-
-// ──────────────────────────────────────────────────────────────────────────────
-// DATA MODEL
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _PlanData {
-  const _PlanData({
-    required this.title,
-    required this.description,
-    required this.progress,
-    required this.totalDays,
-    required this.participants,
-    required this.imageColor,
-    required this.isActive,
-    this.todayReading,
-    this.todayTitle,
-  });
-
-  final String title;
-  final String description;
-  final int progress;
-  final int totalDays;
-  final int participants;
-  final Color imageColor;
-  final bool isActive;
-  final String? todayReading;
-  final String? todayTitle;
-
-  double get progressPercent => progress / totalDays;
-  int get daysRemaining => totalDays - progress;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -294,8 +243,14 @@ class _TabButton extends StatelessWidget {
 }
 
 class _ActivePlanCard extends StatelessWidget {
-  const _ActivePlanCard({required this.plan, required this.isDark});
-  final _PlanData plan;
+  const _ActivePlanCard({
+    required this.userPlan,
+    required this.color,
+    required this.isDark,
+  });
+
+  final UserReadingPlan userPlan;
+  final Color color;
   final bool isDark;
 
   @override
@@ -309,16 +264,15 @@ class _ActivePlanCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Progress Ring
           _ProgressRing(
-            progress: plan.progressPercent,
-            color: plan.imageColor,
+            progress: userPlan.progressPercent,
+            color: color,
             size: 72,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '${(plan.progressPercent * 100).round()}%',
+                  '${(userPlan.progressPercent * 100).round()}%',
                   style: AppTextStyles.labelMedium.copyWith(
                     color: isDark
                         ? AppColors.textPrimaryDark
@@ -335,7 +289,7 @@ class _ActivePlanCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  plan.title,
+                  userPlan.plan.title,
                   style: AppTextStyles.headingSmall.copyWith(
                     color: isDark
                         ? AppColors.textPrimaryDark
@@ -344,7 +298,7 @@ class _ActivePlanCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Day ${plan.progress} of ${plan.totalDays} · ${plan.daysRemaining} days left',
+                  'Day ${userPlan.currentDay} of ${userPlan.plan.totalDays} · ${userPlan.daysRemaining} days left',
                   style: AppTextStyles.bodySmall.copyWith(
                     color: isDark
                         ? AppColors.textSecondaryDark
@@ -352,21 +306,17 @@ class _ActivePlanCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sp2),
-                // Progress bar
                 ClipRRect(
                   borderRadius: AppRadius.borderRadiusFull,
                   child: LinearProgressIndicator(
-                    value: plan.progressPercent,
-                    backgroundColor: isDark
-                        ? AppColors.borderDark
-                        : AppColors.inputFill,
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(plan.imageColor),
+                    value: userPlan.progressPercent,
+                    backgroundColor:
+                        isDark ? AppColors.borderDark : AppColors.inputFill,
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
                     minHeight: 4,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sp2),
-                // Community count
                 Row(
                   children: [
                     Icon(
@@ -378,7 +328,7 @@ class _ActivePlanCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      '${_formatCount(plan.participants)} reading together',
+                      '${_formatCount(userPlan.plan.participantCount)} reading together',
                       style: AppTextStyles.bodySmall.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -393,9 +343,7 @@ class _ActivePlanCard extends StatelessWidget {
           const SizedBox(width: AppSpacing.sp2),
           Icon(
             Icons.chevron_right,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textDisabled,
+            color: isDark ? AppColors.textSecondaryDark : AppColors.textDisabled,
           ),
         ],
       ),
@@ -404,8 +352,8 @@ class _ActivePlanCard extends StatelessWidget {
 }
 
 class _TodayChecklist extends StatefulWidget {
-  const _TodayChecklist({required this.plan, required this.isDark});
-  final _PlanData plan;
+  const _TodayChecklist({required this.userPlan, required this.isDark});
+  final UserReadingPlan userPlan;
   final bool isDark;
 
   @override
@@ -415,7 +363,7 @@ class _TodayChecklist extends StatefulWidget {
 class _TodayChecklistState extends State<_TodayChecklist> {
   final List<bool> _checked = [false, false, false];
 
-  final _items = const [
+  static const _items = [
     'Read today\'s scripture passage',
     'Reflect on the devotional prompt',
     'Pray for understanding and application',
@@ -435,11 +383,7 @@ class _TodayChecklistState extends State<_TodayChecklist> {
         children: [
           Row(
             children: [
-              Icon(
-                Icons.task_alt_outlined,
-                size: 20,
-                color: AppColors.gold,
-              ),
+              Icon(Icons.task_alt_outlined, size: 20, color: AppColors.gold),
               const SizedBox(width: AppSpacing.sp2),
               Text(
                 "Today's Checklist",
@@ -451,37 +395,28 @@ class _TodayChecklistState extends State<_TodayChecklist> {
               ),
             ],
           ),
-          if (widget.plan.todayTitle != null) ...[
-            const SizedBox(height: AppSpacing.sp2),
-            Text(
-              widget.plan.todayTitle!,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: widget.isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondary,
-              ),
+          const SizedBox(height: AppSpacing.sp2),
+          Text(
+            'Day ${widget.userPlan.currentDay} · ${widget.userPlan.plan.title}',
+            style: AppTextStyles.bodySmall.copyWith(
+              color: widget.isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondary,
             ),
-          ],
-          if (widget.plan.todayReading != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              widget.plan.todayReading!,
-              style: AppTextStyles.bodySmall.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+          ),
           const SizedBox(height: AppSpacing.sp4),
-          ...List.generate(_items.length, (i) => _ChecklistItem(
-                label: _items[i],
-                isChecked: _checked[i],
-                isDark: widget.isDark,
-                onChanged: (val) {
-                  HapticFeedback.lightImpact();
-                  setState(() => _checked[i] = val ?? false);
-                },
-              )),
+          ...List.generate(
+            _items.length,
+            (i) => _ChecklistItem(
+              label: _items[i],
+              isChecked: _checked[i],
+              isDark: widget.isDark,
+              onChanged: (val) {
+                HapticFeedback.lightImpact();
+                setState(() => _checked[i] = val ?? false);
+              },
+            ),
+          ),
         ],
       ),
     );
@@ -535,9 +470,8 @@ class _ChecklistItem extends StatelessWidget {
                     : (isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimary),
-                decoration: isChecked
-                    ? TextDecoration.lineThrough
-                    : TextDecoration.none,
+                decoration:
+                    isChecked ? TextDecoration.lineThrough : TextDecoration.none,
               ),
             ),
           ),
@@ -548,16 +482,20 @@ class _ChecklistItem extends StatelessWidget {
 }
 
 class _BrowsePlanCard extends StatelessWidget {
-  const _BrowsePlanCard({required this.plan, required this.isDark});
-  final _PlanData plan;
+  const _BrowsePlanCard({
+    required this.plan,
+    required this.color,
+    required this.isDark,
+  });
+
+  final ReadingPlan plan;
+  final Color color;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
     return AppTapAnimation(
-      onTap: () {
-        // TODO: navigate to plan detail
-      },
+      onTap: () {},
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.sp4),
         decoration: BoxDecoration(
@@ -567,20 +505,15 @@ class _BrowsePlanCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // Plan icon
             Container(
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: plan.imageColor.withValues(alpha: 0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: AppRadius.borderRadiusMd,
               ),
               child: Center(
-                child: Icon(
-                  Icons.menu_book_outlined,
-                  color: plan.imageColor,
-                  size: 28,
-                ),
+                child: Icon(Icons.menu_book_outlined, color: color, size: 28),
               ),
             ),
             const SizedBox(width: AppSpacing.sp3),
@@ -636,7 +569,7 @@ class _BrowsePlanCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        _formatCount(plan.participants),
+                        _formatCount(plan.participantCount),
                         style: AppTextStyles.bodySmall.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark
@@ -674,21 +607,19 @@ class _BrowsePlanCard extends StatelessWidget {
   }
 }
 
-// ── Progress Ring Widget ────────────────────────────────────────────────────
+// ── Progress Ring ────────────────────────────────────────────────────────────
 
 class _ProgressRing extends StatelessWidget {
   const _ProgressRing({
     required this.progress,
     required this.color,
     this.size = 64,
-    this.strokeWidth = 5,
     this.child,
   });
 
   final double progress;
   final Color color;
   final double size;
-  final double strokeWidth;
   final Widget? child;
 
   @override
@@ -708,7 +639,7 @@ class _ProgressRing extends StatelessWidget {
               color: color,
               backgroundColor:
                   isDark ? AppColors.borderDark : AppColors.inputFill,
-              strokeWidth: strokeWidth,
+              strokeWidth: 5,
             ),
           ),
           if (child != null) child!,
@@ -736,7 +667,6 @@ class _RingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (size.width - strokeWidth) / 2;
 
-    // Background circle
     final bgPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke
@@ -745,7 +675,6 @@ class _RingPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, bgPaint);
 
-    // Progress arc
     final progressPaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
@@ -754,7 +683,7 @@ class _RingPainter extends CustomPainter {
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2, // Start from top
+      -math.pi / 2,
       2 * math.pi * progress,
       false,
       progressPaint,
@@ -767,11 +696,9 @@ class _RingPainter extends CustomPainter {
   }
 }
 
-// ── Helper ──────────────────────────────────────────────────────────────────
+// ── Helper ───────────────────────────────────────────────────────────────────
 
 String _formatCount(int count) {
-  if (count >= 1000) {
-    return '${(count / 1000).toStringAsFixed(1)}K';
-  }
+  if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
   return count.toString();
 }

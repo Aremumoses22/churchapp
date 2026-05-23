@@ -45,7 +45,7 @@ const app = express();
 // ── Global middleware ───────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: env.corsOrigin,
+  origin: env.corsOrigin === '*' ? true : env.corsOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

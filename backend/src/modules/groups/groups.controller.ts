@@ -3,13 +3,15 @@ import type { AuthRequest } from '../../middleware/auth';
 import { groupsService } from './groups.service';
 import { ApiError } from '../../utils/apiError';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
 export async function listGroups(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await groupsService.listGroups(req.user.churchId, req.user.id, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await groupsService.listGroups(churchId, req.user!.id, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }

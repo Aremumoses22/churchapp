@@ -3,6 +3,7 @@ import { AuthRequest } from '../../middleware/auth';
 import { givingService } from './giving.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { ApiError } from '../../utils/apiError';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 // Helper to safely extract param (Express 5 params can be string | string[])
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
@@ -15,8 +16,9 @@ const param = (req: AuthRequest, name: string): string => req.params[name] as st
 
 export async function getCategories(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const categories = await givingService.getCategories(req.user.churchId);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const categories = await givingService.getCategories(churchId);
     ApiResponse.success(res, categories);
   } catch (error) {
     next(error);
@@ -27,12 +29,13 @@ export async function getCategories(req: AuthRequest, res: Response, next: NextF
 
 export async function donate(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
 
     const result = await givingService.donate({
-      userId: req.user.id,
-      churchId: req.user.churchId,
-      email: req.user.email,
+      userId: req.user!.id,
+      churchId,
+      email: req.user!.email,
       ...req.body,
     });
 
@@ -59,13 +62,14 @@ export async function verifyTransaction(req: AuthRequest, res: Response, next: N
 
 export async function getDonationHistory(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
 
     const { page, limit, status, startDate, endDate, categoryId, campaignId } = req.query as any;
 
     const result = await givingService.getDonationHistory({
-      userId: req.user.id,
-      churchId: req.user.churchId,
+      userId: req.user!.id,
+      churchId,
       page: Number(page),
       limit: Number(limit),
       status,
@@ -103,8 +107,9 @@ export async function downloadReceipt(req: AuthRequest, res: Response, next: Nex
 
 export async function getGivingSummary(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const summary = await givingService.getGivingSummary(req.user.id, req.user.churchId);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const summary = await givingService.getGivingSummary(req.user!.id, churchId);
     ApiResponse.success(res, summary);
   } catch (error) {
     next(error);
@@ -147,10 +152,11 @@ export async function removePaymentMethod(req: AuthRequest, res: Response, next:
 
 export async function getCampaigns(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
     const { page, limit, active } = req.query as any;
     const result = await givingService.getCampaigns(
-      req.user.churchId,
+      churchId,
       Number(page),
       Number(limit),
       active,
@@ -163,8 +169,9 @@ export async function getCampaigns(req: AuthRequest, res: Response, next: NextFu
 
 export async function getCampaignById(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const campaign = await givingService.getCampaignById(req.user.churchId, param(req, 'id'));
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const campaign = await givingService.getCampaignById(churchId, param(req, 'id'));
     ApiResponse.success(res, campaign);
   } catch (error) {
     next(error);
@@ -173,12 +180,13 @@ export async function getCampaignById(req: AuthRequest, res: Response, next: Nex
 
 export async function donateToCampaign(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
 
     const result = await givingService.donate({
-      userId: req.user.id,
-      churchId: req.user.churchId,
-      email: req.user.email,
+      userId: req.user!.id,
+      churchId,
+      email: req.user!.email,
       campaignId: param(req, 'id'),
       ...req.body,
     });
@@ -193,11 +201,12 @@ export async function donateToCampaign(req: AuthRequest, res: Response, next: Ne
 
 export async function getPledges(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
     const { page, limit, status } = req.query as any;
     const result = await givingService.getPledges(
-      req.user.id,
-      req.user.churchId,
+      req.user!.id,
+      churchId,
       Number(page),
       Number(limit),
       status,
@@ -210,10 +219,11 @@ export async function getPledges(req: AuthRequest, res: Response, next: NextFunc
 
 export async function createPledge(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
     const pledge = await givingService.createPledge({
-      userId: req.user.id,
-      churchId: req.user.churchId,
+      userId: req.user!.id,
+      churchId,
       ...req.body,
     });
     ApiResponse.created(res, pledge, 'Pledge created');
@@ -248,8 +258,9 @@ export async function cancelPledge(req: AuthRequest, res: Response, next: NextFu
 
 export async function getRecurringDonations(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const recurring = await givingService.getRecurringDonations(req.user.id, req.user.churchId);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const recurring = await givingService.getRecurringDonations(req.user!.id, churchId);
     ApiResponse.success(res, recurring);
   } catch (error) {
     next(error);
@@ -258,10 +269,11 @@ export async function getRecurringDonations(req: AuthRequest, res: Response, nex
 
 export async function createRecurring(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
     const recurring = await givingService.createRecurring({
-      userId: req.user.id,
-      churchId: req.user.churchId,
+      userId: req.user!.id,
+      churchId,
       ...req.body,
     });
     ApiResponse.created(res, recurring, 'Recurring donation created');

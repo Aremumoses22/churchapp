@@ -8,147 +8,92 @@ import '../repositories/forum_repository.dart';
 // FORUM PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-final forumRepositoryProvider = Provider<MockForumRepository>((_) {
-  return MockForumRepository();
-});
-
-final apiForumRepositoryProvider = Provider<ApiForumRepository>((_) {
-  return ApiForumRepository();
+final forumRepositoryProvider = Provider<ForumRepository>((_) {
+  return ForumRepository();
 });
 
 // ── API async providers ───────────────────────────────────────────────────────
 
 final forumCategoriesProvider =
     FutureProvider<List<ForumCategory>>((ref) async {
-  final res = await ref.watch(apiForumRepositoryProvider).fetchCategories();
-  if (res.success && (res.data?.isNotEmpty ?? false)) return res.data!;
-  // Fallback to mock when server is unavailable
-  return ref.read(forumRepositoryProvider).getCategories();
+  final res = await ref.watch(forumRepositoryProvider).fetchCategories();
+  if (!res.success) throw Exception(res.message);
+  return res.data ?? [];
 });
 
 final forumTrendingProvider =
     FutureProvider<List<ForumThread>>((ref) async {
-  final res = await ref.watch(apiForumRepositoryProvider).fetchTrending();
-  if (res.success && (res.data?.isNotEmpty ?? false)) return res.data!;
-  return ref.read(forumRepositoryProvider).getTrendingTopics();
+  final res = await ref.watch(forumRepositoryProvider).fetchTrending();
+  if (!res.success) throw Exception(res.message);
+  return res.data ?? [];
 });
 
 final forumRecentProvider =
     FutureProvider<List<ForumThread>>((ref) async {
-  final res =
-      await ref.watch(apiForumRepositoryProvider).fetchRecentThreads();
-  if (res.success && res.data.isNotEmpty) return res.data;
-  return ref.read(forumRepositoryProvider).getRecentThreads();
+  final res = await ref.watch(forumRepositoryProvider).fetchRecentThreads();
+  if (!res.success) throw Exception(res.message);
+  return res.data;
 });
 
 final forumCategoryThreadsProvider =
     FutureProvider.family<List<ForumThread>, String>((ref, categoryId) async {
   final res = await ref
-      .watch(apiForumRepositoryProvider)
+      .watch(forumRepositoryProvider)
       .fetchCategoryThreads(categoryId);
-  if (res.success && res.data.isNotEmpty) return res.data;
-  return ref
-      .read(forumRepositoryProvider)
-      .getThreadsForCategory(categoryId);
+  if (!res.success) throw Exception(res.message);
+  return res.data;
 });
 
-// ── Local form state ─────────────────────────────────────────────────────────
+// ── Forum screen search state ─────────────────────────────────────────────────
 
 class ForumState {
   const ForumState({
-    this.categories = const [],
-    this.trending = const [],
-    this.recentThreads = const [],
     this.searchQuery = '',
   });
 
-  final List<ForumCategory> categories;
-  final List<ForumThread> trending;
-  final List<ForumThread> recentThreads;
   final String searchQuery;
 
-  ForumState copyWith({
-    List<ForumCategory>? categories,
-    List<ForumThread>? trending,
-    List<ForumThread>? recentThreads,
-    String? searchQuery,
-  }) {
-    return ForumState(
-      categories: categories ?? this.categories,
-      trending: trending ?? this.trending,
-      recentThreads: recentThreads ?? this.recentThreads,
-      searchQuery: searchQuery ?? this.searchQuery,
-    );
-  }
-
-  List<ForumThread> get filteredThreads {
-    if (searchQuery.isEmpty) return recentThreads;
-    final q = searchQuery.toLowerCase();
-    return recentThreads
-        .where((t) =>
-            t.title.toLowerCase().contains(q) ||
-            t.author.toLowerCase().contains(q) ||
-            t.body.toLowerCase().contains(q))
-        .toList();
+  ForumState copyWith({String? searchQuery}) {
+    return ForumState(searchQuery: searchQuery ?? this.searchQuery);
   }
 }
 
 class ForumNotifier extends StateNotifier<ForumState> {
-  ForumNotifier(this._repo) : super(const ForumState()) {
-    _init();
-  }
-  final MockForumRepository _repo;
-
-  void _init() {
-    state = state.copyWith(
-      categories: _repo.getCategories(),
-      trending: _repo.getTrendingTopics(),
-      recentThreads: _repo.getRecentThreads(),
-    );
-  }
+  ForumNotifier() : super(const ForumState());
 
   void setSearchQuery(String q) => state = state.copyWith(searchQuery: q);
-
-  void updateFromApi({
-    List<ForumCategory>? categories,
-    List<ForumThread>? trending,
-    List<ForumThread>? recentThreads,
-  }) {
-    state = state.copyWith(
-      categories: categories,
-      trending: trending,
-      recentThreads: recentThreads,
-    );
-  }
 }
 
 final forumNotifierProvider =
-    StateNotifierProvider<ForumNotifier, ForumState>((ref) {
-  return ForumNotifier(ref.watch(forumRepositoryProvider));
-});
+    StateNotifierProvider<ForumNotifier, ForumState>((_) => ForumNotifier());
 
 // ── Category Thread State ─────────────────────────────────────────────────────
 
 class CategoryThreadState {
   const CategoryThreadState({
     this.threads = const [],
-    this.meta,
+    this.isLoading = true,
     this.sortIndex = 0,
+    this.error,
   });
 
   final List<ForumThread> threads;
-  final ForumCategory? meta;
+  final bool isLoading;
   final int sortIndex;
+  final String? error;
 
   CategoryThreadState copyWith({
     List<ForumThread>? threads,
-    ForumCategory? meta,
+    bool? isLoading,
     int? sortIndex,
+    String? error,
+    bool clearError = false,
   }) {
     return CategoryThreadState(
       threads: threads ?? this.threads,
-      meta: meta ?? this.meta,
+      isLoading: isLoading ?? this.isLoading,
       sortIndex: sortIndex ?? this.sortIndex,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
@@ -156,28 +101,39 @@ class CategoryThreadState {
 class CategoryThreadNotifier extends StateNotifier<CategoryThreadState> {
   CategoryThreadNotifier(this._repo, this.categoryId)
       : super(const CategoryThreadState()) {
-    _init();
+    _load();
   }
-  final MockForumRepository _repo;
+
+  final ForumRepository _repo;
   final String categoryId;
 
-  void _init() {
-    state = state.copyWith(
-      threads: _repo.getThreadsForCategory(categoryId),
-      meta: _repo.getCategoryMeta(categoryId),
-    );
+  Future<void> _load() async {
+    try {
+      final res = await _repo.fetchCategoryThreads(categoryId);
+      if (mounted) {
+        state = state.copyWith(threads: res.data, isLoading: false);
+      }
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load threads',
+        );
+      }
+    }
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    await _load();
   }
 
   void setSortIndex(int index) => state = state.copyWith(sortIndex: index);
-
-  void updateThreads(List<ForumThread> threads) =>
-      state = state.copyWith(threads: threads);
 }
 
 final categoryThreadNotifierProvider = StateNotifierProvider.family<
     CategoryThreadNotifier, CategoryThreadState, String>((ref, categoryId) {
-  return CategoryThreadNotifier(
-      ref.watch(forumRepositoryProvider), categoryId);
+  return CategoryThreadNotifier(ref.watch(forumRepositoryProvider), categoryId);
 });
 
 // ── Thread Detail State ───────────────────────────────────────────────────────
@@ -189,6 +145,8 @@ class ThreadDetailState {
     this.isLiked = false,
     this.isBookmarked = false,
     this.likeCount = 0,
+    this.isLoading = true,
+    this.error,
   });
 
   final ForumPost? post;
@@ -196,6 +154,8 @@ class ThreadDetailState {
   final bool isLiked;
   final bool isBookmarked;
   final int likeCount;
+  final bool isLoading;
+  final String? error;
 
   ThreadDetailState copyWith({
     ForumPost? post,
@@ -203,6 +163,9 @@ class ThreadDetailState {
     bool? isLiked,
     bool? isBookmarked,
     int? likeCount,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
   }) {
     return ThreadDetailState(
       post: post ?? this.post,
@@ -210,45 +173,49 @@ class ThreadDetailState {
       isLiked: isLiked ?? this.isLiked,
       isBookmarked: isBookmarked ?? this.isBookmarked,
       likeCount: likeCount ?? this.likeCount,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }
 
 class ThreadDetailNotifier extends StateNotifier<ThreadDetailState> {
-  ThreadDetailNotifier(this._mockRepo, this._apiRepo, this.threadId)
+  ThreadDetailNotifier(this._repo, this.threadId)
       : super(const ThreadDetailState()) {
-    _init();
+    _load();
   }
-  final MockForumRepository _mockRepo;
-  final ApiForumRepository _apiRepo;
+
+  final ForumRepository _repo;
   final String threadId;
 
-  void _init() {
-    // Seed with mock data immediately, then load from API
-    final mockPost = _mockRepo.getPost(threadId);
-    final mockReplies = _mockRepo.getReplies(threadId);
-    state = state.copyWith(
-      post: mockPost,
-      replies: mockReplies,
-      likeCount: mockPost.likeCount,
-    );
-    _loadFromApi();
-  }
-
-  Future<void> _loadFromApi() async {
-    final postRes = await _apiRepo.fetchThread(threadId);
-    if (postRes.success && postRes.data != null) {
-      final post = postRes.data!;
-      state = state.copyWith(
-        post: post,
-        likeCount: post.likeCount,
-        isLiked: post.isLiked,
-        isBookmarked: post.isBookmarked,
-      );
-    }
-    final repliesRes = await _apiRepo.fetchReplies(threadId);
-    if (repliesRes.success && repliesRes.data.isNotEmpty) {
-      state = state.copyWith(replies: repliesRes.data);
+  Future<void> _load() async {
+    try {
+      final res = await _repo.fetchThread(threadId);
+      if (res.data != null) {
+        final detail = res.data!;
+        if (mounted) {
+          state = state.copyWith(
+            post: detail.post,
+            replies: detail.replies,
+            likeCount: detail.post.likeCount,
+            isLiked: detail.post.isLiked,
+            isBookmarked: detail.post.isBookmarked,
+            isLoading: false,
+            clearError: true,
+          );
+        }
+      } else {
+        if (mounted) {
+          state = state.copyWith(
+            isLoading: false,
+            error: res.message.isNotEmpty ? res.message : 'Failed to load thread',
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(isLoading: false, error: e.toString());
+      }
     }
   }
 
@@ -258,9 +225,15 @@ class ThreadDetailNotifier extends StateNotifier<ThreadDetailState> {
       isLiked: optimistic,
       likeCount: optimistic ? state.likeCount + 1 : state.likeCount - 1,
     );
-    final res = await _apiRepo.toggleLike(threadId);
-    if (!res.success) {
-      // Revert on failure
+    try {
+      final res = await _repo.toggleLike(threadId);
+      if (!res.success) {
+        state = state.copyWith(
+          isLiked: !optimistic,
+          likeCount: optimistic ? state.likeCount - 1 : state.likeCount + 1,
+        );
+      }
+    } catch (_) {
       state = state.copyWith(
         isLiked: !optimistic,
         likeCount: optimistic ? state.likeCount - 1 : state.likeCount + 1,
@@ -271,15 +244,18 @@ class ThreadDetailNotifier extends StateNotifier<ThreadDetailState> {
   Future<void> toggleBookmark() async {
     final optimistic = !state.isBookmarked;
     state = state.copyWith(isBookmarked: optimistic);
-    final res = await _apiRepo.toggleBookmark(threadId);
-    if (!res.success) state = state.copyWith(isBookmarked: !optimistic);
+    try {
+      final res = await _repo.toggleBookmark(threadId);
+      if (!res.success) state = state.copyWith(isBookmarked: !optimistic);
+    } catch (_) {
+      state = state.copyWith(isBookmarked: !optimistic);
+    }
   }
 
   Future<void> toggleReplyLike(String replyId) async {
     final idx = state.replies.indexWhere((r) => r.id == replyId);
     if (idx == -1) return;
     final reply = state.replies[idx];
-
     final optimistic = !reply.isLiked;
     state = state.copyWith(
       replies: state.replies.map((r) {
@@ -290,7 +266,7 @@ class ThreadDetailNotifier extends StateNotifier<ThreadDetailState> {
         );
       }).toList(),
     );
-    final res = await _apiRepo.toggleReplyLike(replyId);
+    final res = await _repo.toggleReplyLike(replyId);
     if (!res.success) {
       state = state.copyWith(
         replies: state.replies.map((r) {
@@ -304,17 +280,18 @@ class ThreadDetailNotifier extends StateNotifier<ThreadDetailState> {
     }
   }
 
+  Future<void> reload() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    await _load();
+  }
+
   Future<void> addReply(String content) async {
-    await _apiRepo.postReply(threadId, content);
-    await _loadFromApi();
+    await _repo.postReply(threadId, content);
+    await _load();
   }
 }
 
 final threadDetailNotifierProvider = StateNotifierProvider.family<
     ThreadDetailNotifier, ThreadDetailState, String>((ref, threadId) {
-  return ThreadDetailNotifier(
-    ref.watch(forumRepositoryProvider),
-    ref.watch(apiForumRepositoryProvider),
-    threadId,
-  );
+  return ThreadDetailNotifier(ref.watch(forumRepositoryProvider), threadId);
 });

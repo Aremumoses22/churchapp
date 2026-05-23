@@ -2,11 +2,12 @@ import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../../middleware/auth';
 import { volunteerService } from './volunteer.service';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const volunteerController = {
   async listOpportunities(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const input: any = {

@@ -3,13 +3,15 @@ import type { AuthRequest } from '../../middleware/auth';
 import { prayerService } from './prayer.service';
 import { ApiError } from '../../utils/apiError';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
 export async function listPrayerRequests(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await prayerService.listPrayerRequests(req.user.churchId, req.user.id, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await prayerService.listPrayerRequests(churchId, req.user!.id, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }
@@ -26,8 +28,9 @@ export async function getMyRequests(req: AuthRequest, res: Response, next: NextF
 
 export async function createPrayerRequest(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await prayerService.createPrayerRequest(req.user.id, req.user.churchId, req.body);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await prayerService.createPrayerRequest(req.user!.id, churchId, req.body);
     ApiResponse.created(res, result, 'Prayer request submitted');
   } catch (error) { next(error); }
 }

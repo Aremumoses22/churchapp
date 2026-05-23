@@ -22,19 +22,6 @@ class _HelpFaqScreenState extends ConsumerState<HelpFaqScreen> {
   String _searchQuery = '';
   int _selectedCategory = 0;
 
-  static const _staticFaqs = [
-    _FaqData(question: 'How do I create an account?', answer: 'Tap "Get Started" on the welcome screen, then choose to sign up with your email or phone number. You will need to enter your church code to connect with your local church.', category: 'Getting Started'),
-    _FaqData(question: 'What is a church code?', answer: 'A church code is a unique identifier for your church. Ask your pastor or church administrator for the code, or look for it on your church website or bulletin.', category: 'Getting Started'),
-    _FaqData(question: 'How do I reset my password?', answer: 'On the login screen, tap "Forgot Password?" and enter your email address. We will send you a reset link that you can use to create a new password.', category: 'Account'),
-    _FaqData(question: 'How do I update my profile?', answer: 'Go to your Profile tab, then tap "Edit Profile." You can update your name, photo, bio, and notification preferences from there.', category: 'Account'),
-    _FaqData(question: 'Is online giving secure?', answer: 'Yes! We use industry-standard encryption and partner with trusted payment processors to ensure your financial information is fully protected.', category: 'Giving'),
-    _FaqData(question: 'How do I set up recurring giving?', answer: 'On the Giving screen, select your amount and choose "Make Recurring." You can set weekly, bi-weekly, or monthly schedules.', category: 'Giving'),
-    _FaqData(question: 'How do I join a connect group?', answer: 'Navigate to Connect Groups from the Community section. Browse available groups by category and tap "Join Group" on any open group.', category: 'Groups'),
-    _FaqData(question: 'How do I register for an event?', answer: 'Go to the Events tab, find the event you are interested in, and tap "Register." Some events may require additional information.', category: 'Events'),
-    _FaqData(question: 'Can I watch services on my TV?', answer: 'Yes! You can cast our live services to your TV using AirPlay or Chromecast. Open the live service and tap the cast icon in the player.', category: 'Technical'),
-    _FaqData(question: 'How do I enable notifications?', answer: 'Go to Profile > Settings > Notifications. You can customize which notifications you receive.', category: 'Technical'),
-    _FaqData(question: 'The app is running slowly. What should I do?', answer: 'Try closing and reopening the app. Make sure you are on the latest version. If issues persist, clear the app cache or reinstall the app.', category: 'Technical'),
-  ];
 
   List<_FaqData> _apiFaqsToLocal(List<ChurchFaq> faqs) {
     return faqs.map((f) => _FaqData(
@@ -74,11 +61,8 @@ class _HelpFaqScreenState extends ConsumerState<HelpFaqScreen> {
         appBar: AppFilledAppBar(title: 'Help & FAQ', showBack: true),
         body: const Center(child: CircularProgressIndicator()),
       ),
-      error: (_, _) => _buildScreen(_staticFaqs, isDark),
-      data: (apiFaqs) {
-        final faqs = apiFaqs.isEmpty ? _staticFaqs : _apiFaqsToLocal(apiFaqs);
-        return _buildScreen(faqs, isDark);
-      },
+      error: (_, _) => _buildScreen(const [], isDark),
+      data: (apiFaqs) => _buildScreen(_apiFaqsToLocal(apiFaqs), isDark),
     );
   }
 

@@ -41,6 +41,7 @@ import '../../features/search/global_search_screen.dart';
 import '../../features/giving/giving_campaign_screen.dart';
 import '../../features/giving/giving_screen.dart';
 import '../../features/giving/giving_success_screen.dart';
+import '../../features/giving/paystack_checkout_screen.dart';
 import '../../features/giving/pledge_screen.dart';
 import '../../features/giving/receipt_detail_screen.dart';
 import '../../features/home/home_screen.dart';
@@ -345,12 +346,36 @@ final GoRouter appRouter = GoRouter(
               ),
               routes: [
                 GoRoute(
+                  path: 'checkout',
+                  name: 'giving-checkout',
+                  pageBuilder: (context, state) => slideFadePage(
+                    key: state.pageKey,
+                    name: 'giving-checkout',
+                    child: PaystackCheckoutScreen(
+                      amount: int.tryParse(
+                              state.uri.queryParameters['amount'] ?? '') ??
+                          0,
+                      categoryId:
+                          state.uri.queryParameters['categoryId'] ?? '',
+                      categoryName:
+                          state.uri.queryParameters['categoryName'] ?? '',
+                      paymentMethod:
+                          state.uri.queryParameters['method'] ?? 'CARD',
+                    ),
+                  ),
+                ),
+                GoRoute(
                   path: 'success',
                   name: 'giving-success',
                   pageBuilder: (context, state) => scaleFadePage(
                     key: state.pageKey,
                     name: 'giving-success',
-                    child: const GivingSuccessScreen(),
+                    child: GivingSuccessScreen(
+                      amount: double.tryParse(
+                          state.uri.queryParameters['amount'] ?? ''),
+                      reference: state.uri.queryParameters['ref'],
+                      category: state.uri.queryParameters['category'],
+                    ),
                   ),
                 ),
                 GoRoute(
@@ -642,11 +667,14 @@ final GoRouter appRouter = GoRouter(
       path: AppRoutes.groupDetail,
       name: 'group-detail',
       parentNavigatorKey: _rootNavigatorKey,
-      pageBuilder: (context, state) => slideFadePage(
-        key: state.pageKey,
-        name: 'group-detail',
-        child: const GroupDetailScreen(),
-      ),
+      pageBuilder: (context, state) {
+        final id = state.pathParameters['id']!;
+        return slideFadePage(
+          key: state.pageKey,
+          name: 'group-detail',
+          child: GroupDetailScreen(groupId: id),
+        );
+      },
     ),
     GoRoute(
       path: AppRoutes.testimonies,

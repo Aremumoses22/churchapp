@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../core/models/kids.dart';
+import '../../core/providers/kids_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -10,46 +15,32 @@ import '../../shared/widgets/widgets.dart';
 // pickup verification badge.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class KidsCheckinScreen extends StatefulWidget {
+class KidsCheckinScreen extends ConsumerStatefulWidget {
   const KidsCheckinScreen({super.key});
 
   @override
-  State<KidsCheckinScreen> createState() => _KidsCheckinScreenState();
+  ConsumerState<KidsCheckinScreen> createState() => _KidsCheckinScreenState();
 }
 
-class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
+class _KidsCheckinScreenState extends ConsumerState<KidsCheckinScreen> {
   int _step = 0; // 0 = select children, 1 = assign rooms, 2 = QR result
 
-  final List<_ChildData> _children = [
-    _ChildData(
-        name: 'Ethan', age: 7, allergies: 'None', photo: 'E', selected: false),
-    _ChildData(
-        name: 'Olivia',
-        age: 4,
-        allergies: 'Peanuts',
-        photo: 'O',
-        selected: false),
-    _ChildData(
-        name: 'Noah', age: 2, allergies: 'None', photo: 'N', selected: false),
-  ];
+  // Child IDs that are selected
+  final Set<String> _childSelected = {};
 
+  // childId → roomId
   final Map<String, String> _roomAssignments = {};
 
-  List<_ChildData> get _selectedChildren =>
-      _children.where((c) => c.selected).toList();
+  // Check-in results from the API
+  List<KidsCheckInResult> _checkInResults = [];
+  bool _isCheckingIn = false;
 
-  static const _rooms = {
-    '0-2': ['Nursery A — Room 101', 'Nursery B — Room 102'],
-    '3-5': [
-      'Little Lambs — Room 201',
-      'Tiny Treasures — Room 202',
-    ],
-    '6-8': [
-      'Mighty Warriors — Room 301',
-      'Faith Explorers — Room 302',
-    ],
-    '9-12': ['Trailblazers — Room 401', 'Young Disciples — Room 402'],
-  };
+  List<KidsChild> get _selectedChildren {
+    final kidsState = ref.read(kidsNotifierProvider);
+    return kidsState.children
+        .where((c) => _childSelected.contains(c.id))
+        .toList();
+  }
 
   String _ageGroup(int age) {
     if (age <= 2) return '0-2';
@@ -58,8 +49,37 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
     return '9-12';
   }
 
-  List<String> _roomsForChild(_ChildData child) {
-    return _rooms[_ageGroup(child.age)] ?? [];
+  List<KidsRoom> _roomsForChild(KidsChild child, List<KidsRoom> allRooms) {
+    final group = _ageGroup(child.age);
+    return allRooms.where((r) => r.ageGroup == group).toList();
+  }
+
+  Future<void> _doCheckIn() async {
+    setState(() => _isCheckingIn = true);
+    final repo = ref.read(kidsRepositoryProvider);
+    final results = <KidsCheckInResult>[];
+    try {
+      for (final child in _selectedChildren) {
+        final roomId = _roomAssignments[child.id];
+        if (roomId == null) continue;
+        final result = await repo.checkIn(childId: child.id, roomId: roomId);
+        results.add(result);
+      }
+      setState(() {
+        _checkInResults = results;
+        _isCheckingIn = false;
+        _step = 2;
+      });
+    } catch (e) {
+      setState(() => _isCheckingIn = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Check-in failed: ${e.toString()}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: AppColors.error,
+        ));
+      }
+    }
   }
 
   @override
@@ -181,6 +201,36 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
   // ── Step 0: Select children ─────────────────────────────────────────────
 
   Widget _buildSelectStep(bool isDark) {
+    final kidsState = ref.watch(kidsNotifierProvider);
+
+    if (kidsState.isLoading) {
+      return const Center(key: ValueKey(0), child: CircularProgressIndicator());
+    }
+
+    if (kidsState.error != null) {
+      return Center(
+        key: const ValueKey(0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Failed to load children',
+                style: AppTextStyles.bodyMedium.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary)),
+            const SizedBox(height: AppSpacing.sp3),
+            AppGhostButton(
+              label: 'Retry',
+              onPressed: () =>
+                  ref.read(kidsNotifierProvider.notifier).refresh(),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final children = kidsState.children;
+
     return Column(
       key: const ValueKey(0),
       children: [
@@ -209,33 +259,33 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.screenHorizontalPadding),
-            itemCount: _children.length + 1, // +1 for add child
+            itemCount: children.length + 1, // +1 for add child
             itemBuilder: (context, i) {
-              if (i == _children.length) {
+              if (i == children.length) {
                 return Padding(
                   padding: const EdgeInsets.only(top: AppSpacing.sp2),
                   child: AppGhostButton(
                     label: 'Add a Child',
                     icon: const Icon(Icons.add, size: 18),
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: const Text(
-                            'Child registration would open here.'),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: AppRadius.borderRadiusSm),
-                      ));
-                    },
+                    onPressed: () => _showAddChildDialog(isDark),
                   ),
                 );
               }
-              final child = _children[i];
+              final child = children[i];
+              final isSelected = _childSelected.contains(child.id);
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
                 child: _ChildSelectCard(
                   child: child,
                   isDark: isDark,
-                  onTap: () => setState(() => child.selected = !child.selected),
+                  isSelected: isSelected,
+                  onTap: () => setState(() {
+                    if (isSelected) {
+                      _childSelected.remove(child.id);
+                    } else {
+                      _childSelected.add(child.id);
+                    }
+                  }),
                 ),
               );
             },
@@ -250,7 +300,7 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
           child: AppPrimaryButton(
             label: 'Next — Assign Rooms',
             isFullWidth: true,
-            onPressed: _selectedChildren.isEmpty
+            onPressed: _childSelected.isEmpty
                 ? null
                 : () => setState(() => _step = 1),
           ),
@@ -259,9 +309,90 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
     );
   }
 
+  void _showAddChildDialog(bool isDark) {
+    final firstCtrl = TextEditingController();
+    final lastCtrl = TextEditingController();
+    final dobCtrl = TextEditingController();
+    final allergyCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Register Child'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: firstCtrl,
+                decoration: const InputDecoration(labelText: 'First Name'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: lastCtrl,
+                decoration: const InputDecoration(labelText: 'Last Name'),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: dobCtrl,
+                decoration: const InputDecoration(
+                    labelText: 'Date of Birth (YYYY-MM-DD)'),
+                keyboardType: TextInputType.datetime,
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: allergyCtrl,
+                decoration:
+                    const InputDecoration(labelText: 'Allergies (optional)'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              if (firstCtrl.text.isEmpty ||
+                  lastCtrl.text.isEmpty ||
+                  dobCtrl.text.isEmpty) {
+                return;
+              }
+              try {
+                await ref.read(kidsNotifierProvider.notifier).addChild(
+                      firstCtrl.text.trim(),
+                      lastCtrl.text.trim(),
+                      dobCtrl.text.trim(),
+                      allergyCtrl.text.trim().isEmpty
+                          ? null
+                          : allergyCtrl.text.trim(),
+                    );
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                    content: Text('Failed to add child: $e'),
+                    behavior: SnackBarBehavior.floating,
+                    backgroundColor: AppColors.error,
+                  ));
+                }
+              }
+            },
+            child: const Text('Register'),
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── Step 1: Assign rooms ────────────────────────────────────────────────
 
   Widget _buildRoomStep(bool isDark) {
+    final allRooms = ref.watch(kidsNotifierProvider).rooms;
+    final selected = _selectedChildren;
+
     return Column(
       key: const ValueKey(1),
       children: [
@@ -290,11 +421,11 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
           child: ListView.builder(
             padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.screenHorizontalPadding),
-            itemCount: _selectedChildren.length,
+            itemCount: selected.length,
             itemBuilder: (context, i) {
-              final child = _selectedChildren[i];
-              final rooms = _roomsForChild(child);
-              final assigned = _roomAssignments[child.name];
+              final child = selected[i];
+              final rooms = _roomsForChild(child, allRooms);
+              final assignedRoomId = _roomAssignments[child.id];
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sp4),
@@ -314,7 +445,7 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                             radius: 18,
                             backgroundColor:
                                 AppColors.primary.withValues(alpha: 0.1),
-                            child: Text(child.photo,
+                            child: Text(child.initials,
                                 style: AppTextStyles.labelMedium
                                     .copyWith(color: AppColors.primary)),
                           ),
@@ -322,13 +453,14 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(child.name,
+                              Text(child.fullName,
                                   style:
                                       AppTextStyles.bodyLargeSemiBold.copyWith(
                                           color: isDark
                                               ? AppColors.textPrimaryDark
                                               : AppColors.textPrimary)),
-                              Text('Age ${child.age} • ${_ageGroup(child.age)} group',
+                              Text(
+                                  'Age ${child.age} • ${_ageGroup(child.age)} group',
                                   style: AppTextStyles.bodySmall.copyWith(
                                       color: isDark
                                           ? AppColors.textSecondaryDark
@@ -336,13 +468,14 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                                       fontSize: 11)),
                             ],
                           ),
-                          if (child.allergies != 'None') ...[
+                          if (child.hasAllergies) ...[
                             const Spacer(),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                   horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: AppColors.warning.withValues(alpha: 0.12),
+                                color:
+                                    AppColors.warning.withValues(alpha: 0.12),
                                 borderRadius: AppRadius.borderRadiusFull,
                               ),
                               child: Row(
@@ -351,7 +484,7 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                                   const Icon(Icons.warning_amber_rounded,
                                       size: 12, color: AppColors.warning),
                                   const SizedBox(width: 3),
-                                  Text(child.allergies,
+                                  Text(child.allergies ?? '',
                                       style: AppTextStyles.bodySmall.copyWith(
                                           color: AppColors.warning,
                                           fontSize: 10)),
@@ -362,61 +495,84 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sp3),
-                      ...rooms.map((room) {
-                        final isSel = assigned == room;
-                        return Padding(
-                          padding:
-                              const EdgeInsets.only(bottom: AppSpacing.sp2),
-                          child: GestureDetector(
-                            onTap: () => setState(
-                                () => _roomAssignments[child.name] = room),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: AppSpacing.sp3,
-                                  vertical: AppSpacing.sp2 + 2),
-                              decoration: BoxDecoration(
-                                color: isSel
-                                    ? AppColors.primary.withValues(alpha: 0.08)
-                                    : (isDark
-                                        ? AppColors.bgDark
-                                        : AppColors.warmWhite),
-                                borderRadius: AppRadius.borderRadiusMd,
-                                border: Border.all(
-                                  color: isSel
-                                      ? AppColors.primary
-                                      : (isDark
-                                          ? AppColors.borderDark
-                                          : AppColors.inputBorder),
-                                  width: isSel ? 1.5 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    isSel
-                                        ? Icons.radio_button_checked
-                                        : Icons.radio_button_off,
-                                    size: 18,
+                      if (rooms.isEmpty)
+                        Text(
+                          'No rooms available for age group ${_ageGroup(child.age)}',
+                          style: AppTextStyles.bodySmall.copyWith(
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondary),
+                        )
+                      else
+                        ...rooms.map((room) {
+                          final isSel = assignedRoomId == room.id;
+                          return Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sp2),
+                            child: GestureDetector(
+                              onTap: room.isFull
+                                  ? null
+                                  : () => setState(
+                                      () => _roomAssignments[child.id] = room.id),
+                              child: Opacity(
+                                opacity: room.isFull ? 0.5 : 1.0,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: AppSpacing.sp3,
+                                      vertical: AppSpacing.sp2 + 2),
+                                  decoration: BoxDecoration(
                                     color: isSel
                                         ? AppColors.primary
+                                            .withValues(alpha: 0.08)
                                         : (isDark
-                                            ? AppColors.textSecondaryDark
-                                            : AppColors.textDisabled),
+                                            ? AppColors.bgDark
+                                            : AppColors.warmWhite),
+                                    borderRadius: AppRadius.borderRadiusMd,
+                                    border: Border.all(
+                                      color: isSel
+                                          ? AppColors.primary
+                                          : (isDark
+                                              ? AppColors.borderDark
+                                              : AppColors.inputBorder),
+                                      width: isSel ? 1.5 : 1,
+                                    ),
                                   ),
-                                  const SizedBox(width: AppSpacing.sp2),
-                                  Text(room,
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                          color: isSel
-                                              ? AppColors.primary
-                                              : (isDark
-                                                  ? AppColors.textPrimaryDark
-                                                  : AppColors.textPrimary))),
-                                ],
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        isSel
+                                            ? Icons.radio_button_checked
+                                            : Icons.radio_button_off,
+                                        size: 18,
+                                        color: isSel
+                                            ? AppColors.primary
+                                            : (isDark
+                                                ? AppColors.textSecondaryDark
+                                                : AppColors.textDisabled),
+                                      ),
+                                      const SizedBox(width: AppSpacing.sp2),
+                                      Expanded(
+                                        child: Text(
+                                            room.isFull
+                                                ? '${room.name} (Full)'
+                                                : room.name,
+                                            style:
+                                                AppTextStyles.bodyMedium.copyWith(
+                                                    color: isSel
+                                                        ? AppColors.primary
+                                                        : (isDark
+                                                            ? AppColors
+                                                                .textPrimaryDark
+                                                            : AppColors
+                                                                .textPrimary))),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        );
-                      }),
+                          );
+                        }),
                     ],
                   ),
                 ),
@@ -442,12 +598,12 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
               Expanded(
                 flex: 2,
                 child: AppPrimaryButton(
-                  label: 'Check In',
+                  label: _isCheckingIn ? 'Checking In…' : 'Check In',
                   isFullWidth: true,
-                  onPressed:
-                      _roomAssignments.length < _selectedChildren.length
-                          ? null
-                          : () => setState(() => _step = 2),
+                  onPressed: (_roomAssignments.length < selected.length ||
+                          _isCheckingIn)
+                      ? null
+                      : _doCheckIn,
                 ),
               ),
             ],
@@ -460,6 +616,10 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
   // ── Step 2: QR Code result ──────────────────────────────────────────────
 
   Widget _buildQrStep(bool isDark) {
+    final selected = _selectedChildren;
+    final firstResult =
+        _checkInResults.isNotEmpty ? _checkInResults.first : null;
+
     return SingleChildScrollView(
       key: const ValueKey(2),
       padding: const EdgeInsets.symmetric(
@@ -485,7 +645,7 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
                       : AppColors.textPrimary)),
           const SizedBox(height: AppSpacing.sp2),
           Text(
-              '${_selectedChildren.length} ${_selectedChildren.length == 1 ? 'child' : 'children'} checked in',
+              '${selected.length} ${selected.length == 1 ? 'child' : 'children'} checked in',
               style: AppTextStyles.bodyMedium.copyWith(
                   color: isDark
                       ? AppColors.textSecondaryDark
@@ -493,89 +653,133 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
 
           const SizedBox(height: AppSpacing.sp6),
 
-          // QR Code placeholder
-          Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.cardDark : AppColors.surface,
-              borderRadius: AppRadius.borderRadiusLg,
-              border: Border.all(
-                  color: isDark ? AppColors.borderDark : AppColors.inputBorder),
+          // QR Code
+          if (firstResult != null)
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : AppColors.surface,
+                borderRadius: AppRadius.borderRadiusLg,
+                border: Border.all(
+                    color:
+                        isDark ? AppColors.borderDark : AppColors.inputBorder),
+              ),
+              child: firstResult.qrCode.isNotEmpty &&
+                      firstResult.qrCode.contains(',')
+                  ? ClipRRect(
+                      borderRadius: AppRadius.borderRadiusLg,
+                      child: Image.memory(
+                        base64Decode(firstResult.qrCode.split(',').last),
+                        fit: BoxFit.contain,
+                      ),
+                    )
+                  : Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.qr_code_2,
+                            size: 100,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimary),
+                        const SizedBox(height: AppSpacing.sp2),
+                        Text('Pickup Code',
+                            style: AppTextStyles.labelSmall.copyWith(
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondary)),
+                        Text(firstResult.securityCode,
+                            style: AppTextStyles.headingSmall.copyWith(
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.primary,
+                                letterSpacing: 2)),
+                      ],
+                    ),
+            )
+          else
+            Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.cardDark : AppColors.surface,
+                borderRadius: AppRadius.borderRadiusLg,
+                border: Border.all(
+                    color:
+                        isDark ? AppColors.borderDark : AppColors.inputBorder),
+              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.qr_code_2,
-                    size: 100,
+
+          if (firstResult != null) ...[
+            const SizedBox(height: AppSpacing.sp3),
+            Text('Security Code',
+                style: AppTextStyles.labelSmall.copyWith(
                     color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimary),
-                const SizedBox(height: AppSpacing.sp2),
-                Text('Pickup Code',
-                    style: AppTextStyles.labelSmall.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary)),
-                Text('PKU-4821',
-                    style: AppTextStyles.headingSmall.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.primary,
-                        letterSpacing: 2)),
-              ],
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary)),
+            const SizedBox(height: 4),
+            Text(
+              firstResult.securityCode,
+              style: AppTextStyles.headingMedium.copyWith(
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.primary,
+                  letterSpacing: 3),
             ),
-          ),
+          ],
 
           const SizedBox(height: AppSpacing.sp5),
 
           // Child summary cards
-          ..._selectedChildren.map((child) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.sp3),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.cardDark : AppColors.surface,
-                    borderRadius: AppRadius.borderRadiusMd,
-                    boxShadow: isDark ? AppShadows.xsDark : AppShadows.xs,
-                  ),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 16,
-                        backgroundColor:
-                            AppColors.primary.withValues(alpha: 0.1),
-                        child: Text(child.photo,
-                            style: AppTextStyles.labelSmall
-                                .copyWith(color: AppColors.primary)),
-                      ),
-                      const SizedBox(width: AppSpacing.sp3),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(child.name,
-                                style: AppTextStyles.labelMedium.copyWith(
-                                    color: isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimary)),
-                            Text(
-                                _roomAssignments[child.name] ?? 'Unassigned',
-                                style: AppTextStyles.bodySmall.copyWith(
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondary,
-                                    fontSize: 11)),
-                          ],
-                        ),
-                      ),
-                      const Icon(Icons.check_circle,
-                          size: 20, color: AppColors.success),
-                    ],
-                  ),
+          ..._checkInResults.map((result) {
+            final childName = result.child?.fullName ?? '';
+            final initials = result.child?.initials ?? '?';
+            final roomName = result.room.name;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.sp3),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(AppSpacing.sp3),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.cardDark : AppColors.surface,
+                  borderRadius: AppRadius.borderRadiusMd,
+                  boxShadow: isDark ? AppShadows.xsDark : AppShadows.xs,
                 ),
-              )),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor:
+                          AppColors.primary.withValues(alpha: 0.1),
+                      child: Text(initials,
+                          style: AppTextStyles.labelSmall
+                              .copyWith(color: AppColors.primary)),
+                    ),
+                    const SizedBox(width: AppSpacing.sp3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(childName,
+                              style: AppTextStyles.labelMedium.copyWith(
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimary)),
+                          Text(roomName,
+                              style: AppTextStyles.bodySmall.copyWith(
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary,
+                                  fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.check_circle,
+                        size: 20, color: AppColors.success),
+                  ],
+                ),
+              ),
+            );
+          }),
 
           const SizedBox(height: AppSpacing.sp5),
 
@@ -614,35 +818,19 @@ class _KidsCheckinScreenState extends State<KidsCheckinScreen> {
   }
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
-
-class _ChildData {
-  _ChildData({
-    required this.name,
-    required this.age,
-    required this.allergies,
-    required this.photo,
-    required this.selected,
-  });
-
-  final String name;
-  final int age;
-  final String allergies;
-  final String photo;
-  bool selected;
-}
-
 // ── Child selection card ─────────────────────────────────────────────────────
 
 class _ChildSelectCard extends StatelessWidget {
   const _ChildSelectCard({
     required this.child,
     required this.isDark,
+    required this.isSelected,
     required this.onTap,
   });
 
-  final _ChildData child;
+  final KidsChild child;
   final bool isDark;
+  final bool isSelected;
   final VoidCallback onTap;
 
   @override
@@ -656,7 +844,7 @@ class _ChildSelectCard extends StatelessWidget {
           color: isDark ? AppColors.cardDark : AppColors.surface,
           borderRadius: AppRadius.borderRadiusLg,
           boxShadow: isDark ? AppShadows.smDark : AppShadows.sm,
-          border: child.selected
+          border: isSelected
               ? Border.all(color: AppColors.primary, width: 2)
               : null,
         ),
@@ -664,12 +852,12 @@ class _ChildSelectCard extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: child.selected
+              backgroundColor: isSelected
                   ? AppColors.primary.withValues(alpha: 0.15)
                   : (isDark ? AppColors.skyDark : AppColors.inputFill),
-              child: Text(child.photo,
+              child: Text(child.initials,
                   style: AppTextStyles.headingSmall.copyWith(
-                      color: child.selected
+                      color: isSelected
                           ? AppColors.primary
                           : (isDark
                               ? AppColors.textSecondaryDark
@@ -680,7 +868,7 @@ class _ChildSelectCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(child.name,
+                  Text(child.fullName,
                       style: AppTextStyles.bodyLargeSemiBold.copyWith(
                           color: isDark
                               ? AppColors.textPrimaryDark
@@ -694,7 +882,7 @@ class _ChildSelectCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (child.allergies != 'None')
+            if (child.hasAllergies)
               Padding(
                 padding: const EdgeInsets.only(right: AppSpacing.sp2),
                 child: Icon(Icons.warning_amber_rounded,
@@ -706,10 +894,8 @@ class _ChildSelectCard extends StatelessWidget {
               height: 24,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: child.selected
-                    ? AppColors.primary
-                    : Colors.transparent,
-                border: child.selected
+                color: isSelected ? AppColors.primary : Colors.transparent,
+                border: isSelected
                     ? null
                     : Border.all(
                         color: isDark
@@ -717,7 +903,7 @@ class _ChildSelectCard extends StatelessWidget {
                             : AppColors.inputBorder,
                         width: 2),
               ),
-              child: child.selected
+              child: isSelected
                   ? const Icon(Icons.check, size: 14, color: Colors.white)
                   : null,
             ),

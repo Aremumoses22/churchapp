@@ -86,14 +86,113 @@ class _ChatConversationScreenState extends ConsumerState<ChatConversationScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final convState = ref.watch(conversationNotifierProvider(widget.chatId));
+    final meta = convState.meta ??
+        ChatMeta(
+          name: widget.chatName ?? 'Chat',
+          initials: '?',
+          color: AppColors.primary,
+          isOnline: false,
+        );
+
+    // ── New conversation placeholder ──────────────────────────────────
+    if (widget.chatId == 'new' || widget.chatId == 'new-group') {
+      return Scaffold(
+        backgroundColor:
+            isDark ? AppColors.bgDark : const Color(0xFFF8FAFC),
+        appBar: AppFilledAppBar(title: meta.name, showBack: true),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.sp6),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  widget.chatId == 'new-group'
+                      ? Icons.group_add_outlined
+                      : Icons.person_add_outlined,
+                  size: 64,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textDisabled,
+                ),
+                const SizedBox(height: AppSpacing.sp4),
+                Text(
+                  widget.chatId == 'new-group'
+                      ? 'Create Group Chat'
+                      : 'Start a Conversation',
+                  style: AppTextStyles.headingSmall.copyWith(
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: AppSpacing.sp2),
+                Text(
+                  'Select people from the church directory to start chatting.',
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // ── Loading ───────────────────────────────────────────────────────
+    if (convState.isLoading) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : const Color(0xFFF8FAFC),
+        appBar: AppFilledAppBar(title: meta.name, showBack: true),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // ── Error ─────────────────────────────────────────────────────────
+    if (convState.error != null) {
+      return Scaffold(
+        backgroundColor: isDark ? AppColors.bgDark : const Color(0xFFF8FAFC),
+        appBar: AppFilledAppBar(title: meta.name, showBack: true),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 48,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textDisabled,
+              ),
+              const SizedBox(height: AppSpacing.sp3),
+              Text(
+                'Could not load messages',
+                style: AppTextStyles.bodyMedium.copyWith(
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sp3),
+              TextButton(
+                onPressed: () => ref
+                    .read(conversationNotifierProvider(widget.chatId).notifier)
+                    .refresh(),
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     final messages = convState.messages;
     final isTyping = convState.isTyping;
-    final meta = convState.meta ?? ChatMeta(
-      name: widget.chatName ?? 'Chat',
-      initials: '?',
-      color: AppColors.primary,
-      isOnline: false,
-    );
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
     return Scaffold(
@@ -204,7 +303,7 @@ class _ChatConversationScreenState extends ConsumerState<ChatConversationScreen>
 
                 return Column(
                   children: [
-                    if (separator != null) separator,
+                    if (separator case final Widget s) s,
                     _ChatBubble(
                       message: msg,
                       isDark: isDark,
@@ -503,7 +602,7 @@ class _TypingIndicator extends StatelessWidget {
             const SizedBox(width: 4),
             AnimatedBuilder(
               animation: animation,
-              builder: (_, __) => Row(
+              builder: (_, _) => Row(
                 mainAxisSize: MainAxisSize.min,
                 children: List.generate(3, (i) {
                   return Container(

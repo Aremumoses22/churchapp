@@ -12,16 +12,11 @@ import '../services/api_client.dart';
 // See API_INTEGRATION_GUIDE.md § 9
 // ──────────────────────────────────────────────────────────────────────────────
 
-abstract class HomeFeedRepository {
-  Future<ApiResponse<HomeFeed>> getFeed();
-}
-
-class ApiHomeFeedRepository implements HomeFeedRepository {
-  ApiHomeFeedRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
+class HomeFeedRepository {
+  HomeFeedRepository({Dio? dio}) : _dio = dio ?? ApiClient.instance.dio;
 
   final Dio _dio;
 
-  @override
   Future<ApiResponse<HomeFeed>> getFeed() async {
     try {
       final res = await _dio.get(Endpoints.homeFeed);

@@ -28,6 +28,7 @@ abstract final class AppRoutes {
   static const eventDetail = '/events/:id';
 
   static const giving = '/giving';
+  static const givingCheckout = '/giving/checkout';
   static const givingSuccess = '/giving/success';
 
   static const profile = '/profile';

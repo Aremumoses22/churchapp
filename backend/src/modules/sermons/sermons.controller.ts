@@ -2,12 +2,13 @@ import { Response, NextFunction } from 'express';
 import { sermonsService } from './sermons.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const sermonsController = {
   // GET /sermons
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const result = await sermonsService.list(churchId, req.query as any);
       ApiResponse.paginated(res, result.sermons, result.total, result.page, result.limit);
@@ -19,7 +20,7 @@ export const sermonsController = {
   // GET /sermons/featured
   async getFeatured(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const sermons = await sermonsService.getFeatured(churchId);
       ApiResponse.success(res, sermons);
@@ -101,7 +102,7 @@ export const sermonsController = {
   // GET /series
   async listSeries(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const series = await sermonsService.listSeries(churchId);
       ApiResponse.success(res, series);

@@ -321,3 +321,38 @@ class ForumReply {
     );
   }
 }
+
+// Combined response from GET /forum/threads/:id
+// The backend returns { thread: {...}, replies: { data: [...], meta: {...} } }
+class ForumThreadDetail {
+  const ForumThreadDetail({required this.post, required this.replies});
+
+  final ForumPost post;
+  final List<ForumReply> replies;
+
+  factory ForumThreadDetail.fromJson(Map<String, dynamic> json) {
+    final threadJson = json['thread'] as Map<String, dynamic>?;
+    final repliesJson =
+        (json['replies'] as Map<String, dynamic>?)?['data'] as List<dynamic>?;
+
+    return ForumThreadDetail(
+      post: threadJson != null
+          ? ForumPost.fromJson(threadJson)
+          : const ForumPost(
+              title: '',
+              author: '',
+              authorInitials: '?',
+              avatarColor: Color(0xFF64748B),
+              body: '',
+              category: '',
+              categoryColor: Color(0xFF64748B),
+              timeAgo: '',
+              views: 0,
+            ),
+      replies: repliesJson
+              ?.map((r) => ForumReply.fromJson(r as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+  }
+}

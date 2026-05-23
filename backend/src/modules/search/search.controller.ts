@@ -2,11 +2,12 @@ import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../../middleware/auth';
 import { searchService } from './search.service';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const searchController = {
   async search(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const input = {
@@ -31,7 +32,7 @@ export const searchController = {
 
   async trending(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const limit = query.limit ?? 10;

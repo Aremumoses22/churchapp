@@ -1,30 +1,32 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
-// PRAYER REQUEST SCREEN — Section 13
+// PRAYER REQUEST SCREEN
 //
-// Bottom-sheet style overlay: title input, details textarea, visibility
-// toggle (public / private), submit button, success animation.
+// Bottom-sheet form: submits to POST /prayer-requests via prayerRequestsProvider.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class PrayerRequestScreen extends StatefulWidget {
+class PrayerRequestScreen extends ConsumerStatefulWidget {
   const PrayerRequestScreen({super.key});
 
   @override
-  State<PrayerRequestScreen> createState() => _PrayerRequestScreenState();
+  ConsumerState<PrayerRequestScreen> createState() =>
+      _PrayerRequestScreenState();
 }
 
-class _PrayerRequestScreenState extends State<PrayerRequestScreen>
-    with SingleTickerProviderStateMixin {
+class _PrayerRequestScreenState extends ConsumerState<PrayerRequestScreen> {
   final _titleCtrl = TextEditingController();
   final _detailsCtrl = TextEditingController();
   bool _isPublic = true;
   bool _submitted = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -62,6 +64,7 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
                   titleCtrl: _titleCtrl,
                   detailsCtrl: _detailsCtrl,
                   isPublic: _isPublic,
+                  isLoading: _isLoading,
                   onToggleVisibility: () =>
                       setState(() => _isPublic = !_isPublic),
                   onSubmit: _submit,
@@ -72,24 +75,51 @@ class _PrayerRequestScreenState extends State<PrayerRequestScreen>
     );
   }
 
-  void _submit() {
-    if (_titleCtrl.text.trim().isEmpty) return;
-    setState(() => _submitted = true);
+  Future<void> _submit() async {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    setState(() => _isLoading = true);
 
-    // Auto-dismiss after 2 seconds
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) Navigator.of(context).pop();
-    });
+    final ok = await ref.read(prayerRequestsProvider.notifier).submit(
+          title: title,
+          content: _detailsCtrl.text.trim().isEmpty
+              ? null
+              : _detailsCtrl.text.trim(),
+          isAnonymous: !_isPublic,
+        );
+
+    if (!mounted) return;
+
+    if (ok) {
+      setState(() {
+        _isLoading = false;
+        _submitted = true;
+      });
+      Timer(const Duration(seconds: 2), () {
+        if (mounted) Navigator.of(context).pop();
+      });
+    } else {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Failed to submit prayer request. Try again.'),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.borderRadiusMd),
+        ),
+      );
+    }
   }
 }
 
-// ── Form content ────────────────────────────────────────────────────────────
+// ── Form content ──────────────────────────────────────────────────────────────
 
 class _FormContent extends StatelessWidget {
   const _FormContent({
     required this.titleCtrl,
     required this.detailsCtrl,
     required this.isPublic,
+    required this.isLoading,
     required this.onToggleVisibility,
     required this.onSubmit,
     required this.isDark,
@@ -98,6 +128,7 @@ class _FormContent extends StatelessWidget {
   final TextEditingController titleCtrl;
   final TextEditingController detailsCtrl;
   final bool isPublic;
+  final bool isLoading;
   final VoidCallback onToggleVisibility;
   final VoidCallback onSubmit;
   final bool isDark;
@@ -115,7 +146,6 @@ class _FormContent extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Handle
             const SizedBox(height: 8),
             Center(
               child: Container(
@@ -128,13 +158,12 @@ class _FormContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sp4),
-
-            // Title
             Text(
               'Share a Prayer Request',
               style: AppTextStyles.headingMedium.copyWith(
-                color:
-                    isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: AppSpacing.sp1),
@@ -147,16 +176,12 @@ class _FormContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sp4),
-
-            // Prayer title input
             AppTextField(
               controller: titleCtrl,
               label: 'Prayer title',
               hint: 'e.g. Healing, Provision, Guidance',
             ),
             const SizedBox(height: AppSpacing.sp4),
-
-            // Details textarea
             Text(
               'Details (optional)',
               style: AppTextStyles.labelMedium.copyWith(
@@ -172,8 +197,9 @@ class _FormContent extends StatelessWidget {
                 color: isDark ? AppColors.bgDark : const Color(0xFFF9FAFB),
                 borderRadius: AppRadius.borderRadiusMd,
                 border: Border.all(
-                  color:
-                      isDark ? AppColors.borderDark : AppColors.inputBorder,
+                  color: isDark
+                      ? AppColors.borderDark
+                      : AppColors.inputBorder,
                 ),
               ),
               child: TextField(
@@ -186,8 +212,10 @@ class _FormContent extends StatelessWidget {
                       : AppColors.textPrimary,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'Share details about your prayer request...',
-                  hintStyle: AppTextStyles.bodyMedium.copyWith(
+                  hintText:
+                      'Share details about your prayer request...',
+                  hintStyle:
+                      AppTextStyles.bodyMedium.copyWith(
                     color: AppColors.textDisabled,
                   ),
                   border: InputBorder.none,
@@ -196,13 +224,12 @@ class _FormContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sp4),
-
-            // Visibility toggle
             GestureDetector(
               onTap: onToggleVisibility,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sp3, vertical: AppSpacing.sp2),
+                    horizontal: AppSpacing.sp3,
+                    vertical: AppSpacing.sp2),
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppColors.bgDark
@@ -245,11 +272,9 @@ class _FormContent extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpacing.sp5),
-
-            // Submit
             AppPrimaryButton(
-              label: 'Send Prayer Request',
-              onPressed: onSubmit,
+              label: isLoading ? 'Sending...' : 'Send Prayer Request',
+              onPressed: isLoading ? null : onSubmit,
             ),
           ],
         ),
@@ -258,7 +283,7 @@ class _FormContent extends StatelessWidget {
   }
 }
 
-// ── Success content ─────────────────────────────────────────────────────────
+// ── Success content ────────────────────────────────────────────────────────────
 
 class _SuccessContent extends StatelessWidget {
   const _SuccessContent({required this.isDark});
@@ -287,9 +312,11 @@ class _SuccessContent extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sp4),
           Text(
-            'Prayer Sent \u{1F64F}',
+            'Prayer Sent',
             style: AppTextStyles.headingMedium.copyWith(
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimary,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: AppSpacing.sp2),

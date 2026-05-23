@@ -7,8 +7,8 @@ import '../repositories/home_feed_repository.dart';
 // HOME FEED PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
-final homeFeedRepositoryProvider = Provider<ApiHomeFeedRepository>((_) {
-  return ApiHomeFeedRepository();
+final homeFeedRepositoryProvider = Provider<HomeFeedRepository>((_) {
+  return HomeFeedRepository();
 });
 
 final homeFeedProvider = FutureProvider<HomeFeed?>((ref) async {

@@ -1,19 +1,17 @@
-import 'dart:async';
-import 'dart:ui';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../models/chat.dart';
 import '../repositories/chat_repository.dart';
 import '../theme/app_colors.dart';
+import 'auth_providers.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // CHAT PROVIDERS
 // ──────────────────────────────────────────────────────────────────────────────
 
 final chatRepositoryProvider = Provider<ChatRepository>((_) {
-  return MockChatRepository();
+  return ChatRepository();
 });
 
 // ── Chat List State ──────────────────────────────────────────────────────────
@@ -23,30 +21,37 @@ class ChatListState {
     this.chats = const [],
     this.filterIndex = 0,
     this.searchQuery = '',
+    this.isLoading = true,
+    this.error,
   });
 
   final List<ChatPreview> chats;
   final int filterIndex; // 0=All, 1=Direct, 2=Groups
   final String searchQuery;
+  final bool isLoading;
+  final String? error;
 
   ChatListState copyWith({
     List<ChatPreview>? chats,
     int? filterIndex,
     String? searchQuery,
+    bool? isLoading,
+    String? error,
+    bool clearError = false,
   }) {
     return ChatListState(
       chats: chats ?? this.chats,
       filterIndex: filterIndex ?? this.filterIndex,
       searchQuery: searchQuery ?? this.searchQuery,
+      isLoading: isLoading ?? this.isLoading,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 
   List<ChatPreview> get filteredChats {
     var list = chats;
-    // Filter by type
     if (filterIndex == 1) list = list.where((c) => !c.isGroup).toList();
     if (filterIndex == 2) list = list.where((c) => c.isGroup).toList();
-    // Search
     if (searchQuery.isNotEmpty) {
       final q = searchQuery.toLowerCase();
       list = list
@@ -55,7 +60,6 @@ class ChatListState {
               c.lastMessage.toLowerCase().contains(q))
           .toList();
     }
-    // Sort: pinned first
     list.sort((a, b) {
       if (a.isPinned && !b.isPinned) return -1;
       if (!a.isPinned && b.isPinned) return 1;
@@ -67,12 +71,28 @@ class ChatListState {
 
 class ChatListNotifier extends StateNotifier<ChatListState> {
   ChatListNotifier(this._repo) : super(const ChatListState()) {
-    _init();
+    _load();
   }
+
   final ChatRepository _repo;
 
-  void _init() {
-    state = state.copyWith(chats: _repo.getChats());
+  Future<void> _load() async {
+    try {
+      final chats = await _repo.fetchConversations();
+      if (mounted) state = state.copyWith(chats: chats, isLoading: false);
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load conversations',
+        );
+      }
+    }
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    await _load();
   }
 
   void setFilter(int index) => state = state.copyWith(filterIndex: index);
@@ -84,6 +104,7 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
       return c;
     }).toList();
     state = state.copyWith(chats: updated);
+    _repo.togglePin(chatId);
   }
 
   void toggleMute(String chatId) {
@@ -92,11 +113,12 @@ class ChatListNotifier extends StateNotifier<ChatListState> {
       return c;
     }).toList();
     state = state.copyWith(chats: updated);
+    _repo.toggleMute(chatId);
   }
 
   void deleteChat(String chatId) {
-    state =
-        state.copyWith(chats: state.chats.where((c) => c.id != chatId).toList());
+    state = state.copyWith(
+        chats: state.chats.where((c) => c.id != chatId).toList());
   }
 }
 
@@ -110,46 +132,94 @@ final chatListNotifierProvider =
 class ConversationState {
   const ConversationState({
     this.messages = const [],
+    this.isLoading = true,
     this.isTyping = false,
+    this.error,
     this.meta,
   });
 
   final List<ChatMessage> messages;
+  final bool isLoading;
   final bool isTyping;
+  final String? error;
   final ChatMeta? meta;
 
   ConversationState copyWith({
     List<ChatMessage>? messages,
+    bool? isLoading,
     bool? isTyping,
+    String? error,
+    bool clearError = false,
     ChatMeta? meta,
   }) {
     return ConversationState(
       messages: messages ?? this.messages,
+      isLoading: isLoading ?? this.isLoading,
       isTyping: isTyping ?? this.isTyping,
+      error: clearError ? null : (error ?? this.error),
       meta: meta ?? this.meta,
     );
   }
 }
 
 class ConversationNotifier extends StateNotifier<ConversationState> {
-  ConversationNotifier(this._repo, this.chatId)
-      : super(const ConversationState()) {
-    _init();
+  ConversationNotifier(
+    this._repo,
+    this.chatId,
+    this._currentUserId, {
+    ChatMeta? initialMeta,
+  })  : _initialMeta = initialMeta,
+        super(const ConversationState()) {
+    _load();
   }
+
   final ChatRepository _repo;
   final String chatId;
-  Timer? _replyTimer;
+  final String _currentUserId;
+  final ChatMeta? _initialMeta;
 
-  void _init() {
-    state = state.copyWith(
-      messages: _repo.getMessages(chatId),
-      meta: _repo.getChatMeta(chatId),
-    );
+  static const _newIds = {'new', 'new-group'};
+
+  Future<void> _load() async {
+    if (_newIds.contains(chatId)) {
+      if (mounted) state = state.copyWith(isLoading: false, meta: _initialMeta);
+      return;
+    }
+    try {
+      final messages = await _repo.fetchMessages(
+        chatId,
+        currentUserId: _currentUserId,
+      );
+      await _repo.markAsRead(chatId);
+      if (mounted) {
+        state = state.copyWith(
+          messages: messages,
+          isLoading: false,
+          meta: _initialMeta,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Failed to load messages',
+          meta: _initialMeta,
+        );
+      }
+    }
+  }
+
+  Future<void> refresh() async {
+    state = state.copyWith(isLoading: true, clearError: true);
+    await _load();
   }
 
   void sendMessage(String text) {
+    if (_newIds.contains(chatId)) return;
+
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
     final msg = ChatMessage(
-      id: 'm${state.messages.length + 1}',
+      id: tempId,
       text: text,
       sender: 'You',
       senderInitials: 'ME',
@@ -159,65 +229,47 @@ class ConversationNotifier extends StateNotifier<ConversationState> {
     );
     state = state.copyWith(messages: [...state.messages, msg]);
 
-    // Simulate auto-reply
-    _replyTimer?.cancel();
-    state = state.copyWith(isTyping: true);
-    _replyTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (!mounted) return;
-      final reply = _generateReply(text);
-      final meta = state.meta;
-      final replyMsg = ChatMessage(
-        id: 'm${state.messages.length + 1}',
-        text: reply,
-        sender: meta?.name ?? 'Friend',
-        senderInitials: meta?.initials ?? '??',
-        senderColor: meta?.color ?? const Color(0xFF059669),
-        time: _formatTime(),
-        isMe: false,
-      );
-      state = state.copyWith(
-        messages: [...state.messages, replyMsg],
-        isTyping: false,
-      );
+    _repo.sendMessage(chatId, text, currentUserId: _currentUserId).then((sent) {
+      if (sent != null && mounted) {
+        final updated = state.messages.where((m) => m.id != tempId).toList();
+        state = state.copyWith(messages: [...updated, sent]);
+      }
     });
   }
 
   String _formatTime() {
     final now = DateTime.now();
-    final h = now.hour > 12 ? now.hour - 12 : now.hour;
+    final h = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
     final m = now.minute.toString().padLeft(2, '0');
     final p = now.hour >= 12 ? 'PM' : 'AM';
     return '$h:$m $p';
-  }
-
-  String _generateReply(String text) {
-    final lower = text.toLowerCase();
-    if (lower.contains('pray')) {
-      return 'I will definitely be praying for you. God is faithful! 🙏';
-    }
-    if (lower.contains('thank')) {
-      return 'You are so welcome! That is what the church family is for. ❤️';
-    }
-    if (lower.contains('hello') || lower.contains('hi')) {
-      return 'Hey there! Great to hear from you. How are you doing?';
-    }
-    if (lower.contains('sunday') || lower.contains('service')) {
-      return 'Can not wait for Sunday! It is going to be a powerful service. See you there! 🙌';
-    }
-    if (lower.contains('bible') || lower.contains('scripture')) {
-      return 'I love diving into the Word. Have you tried the reading plan in the app?';
-    }
-    return 'That is wonderful to hear! God is doing amazing things. 🙏';
-  }
-
-  @override
-  void dispose() {
-    _replyTimer?.cancel();
-    super.dispose();
   }
 }
 
 final conversationNotifierProvider = StateNotifierProvider.family<
     ConversationNotifier, ConversationState, String>((ref, chatId) {
-  return ConversationNotifier(ref.watch(chatRepositoryProvider), chatId);
+  final currentUserId = ref.watch(authNotifierProvider).user?.id ?? '';
+
+  // Look up ChatMeta from already-loaded chat list (read, not watch, to avoid cascade rebuilds)
+  ChatMeta? initialMeta;
+  try {
+    final preview = ref
+        .read(chatListNotifierProvider)
+        .chats
+        .firstWhere((c) => c.id == chatId);
+    initialMeta = ChatMeta(
+      name: preview.name,
+      initials: preview.initials,
+      color: preview.avatarColor,
+      isOnline: preview.isOnline,
+      isGroup: preview.isGroup,
+    );
+  } catch (_) {}
+
+  return ConversationNotifier(
+    ref.watch(chatRepositoryProvider),
+    chatId,
+    currentUserId,
+    initialMeta: initialMeta,
+  );
 });

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/home_feed.dart';
 import '../../core/navigation/app_routes.dart';
+import '../../core/providers/home_feed_providers.dart';
 import '../../core/providers/sermon_providers.dart';
 import '../../core/providers/event_providers.dart';
 import '../../core/providers/user_providers.dart';
@@ -46,9 +48,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   late final Animation<double> _handRotation;
   late final Animation<double> _livePulse;
 
-  bool _isServiceLive = true; // mock: service is live
+  bool _isServiceLive = false;
   bool _liveBannerDismissed = false;
-  static const bool _hasCampaign = true; // mock: active campaign
 
   @override
   void initState() {
@@ -177,6 +178,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         'Friend';
     final sermonState = ref.watch(sermonNotifierProvider);
     final eventState = ref.watch(eventNotifierProvider);
+    final feed = ref.watch(homeFeedProvider).maybeWhen(
+      data: (d) => d,
+      orElse: () => null,
+    );
+    final verse = feed?.verseOfTheDay;
+    final activeCampaigns = feed?.activeCampaigns ?? <FeedCampaign>[];
     // First featured / latest sermon
     final latestSermon =
         sermonState.sermons.isNotEmpty ? sermonState.sermons.first : null;
@@ -218,30 +225,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
 
           // ── 2. Story-style Highlight Circles ──────────────────────────
-          SliverToBoxAdapter(
-            child: _HighlightStories(isDark: isDark),
-          ),
+          if ((feed?.announcements ?? []).isNotEmpty)
+            SliverToBoxAdapter(
+              child: _HighlightStories(
+                isDark: isDark,
+                announcements: feed?.announcements ?? [],
+              ),
+            ),
 
           // ── 3. Today's verse ──────────────────────────────────────────
-          const SliverToBoxAdapter(
+          SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(top: AppSpacing.sp4),
+              padding: const EdgeInsets.only(top: AppSpacing.sp4),
               child: AppVerseCard(
-                reference: 'Psalm 46:10',
-                verseText:
-                    '"Be still, and know that I am God; I will be exalted among the nations, I will be exalted in the earth."',
+                reference: verse?.reference ?? 'Psalm 46:10',
+                verseText: verse?.text.isNotEmpty == true
+                    ? '"${verse!.text}"'
+                    : '"Be still, and know that I am God; I will be exalted among the nations, I will be exalted in the earth."',
               ),
             ),
           ),
 
           // ── 4. Campaign Progress Card ─────────────────────────────────
-          if (_hasCampaign)
+          if (activeCampaigns.isNotEmpty)
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(top: AppSpacing.sp4),
                 child: _CampaignProgressCard(
+                  campaign: activeCampaigns.first,
                   isDark: isDark,
-                  onTap: () => context.push(AppRoutes.givingCampaign),
+                  onTap: () => context.push(
+                    '${AppRoutes.givingCampaign}?id=${activeCampaigns.first.id}',
+                  ),
                 ),
               ),
             ),
@@ -918,8 +933,12 @@ class _RainParticlePainter extends CustomPainter {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class _HighlightStories extends StatefulWidget {
-  const _HighlightStories({required this.isDark});
+  const _HighlightStories({
+    required this.isDark,
+    required this.announcements,
+  });
   final bool isDark;
+  final List<Map<String, dynamic>> announcements;
 
   @override
   State<_HighlightStories> createState() => _HighlightStoriesState();
@@ -928,66 +947,45 @@ class _HighlightStories extends StatefulWidget {
 class _HighlightStoriesState extends State<_HighlightStories> {
   final _viewed = <int>{};
 
-  static const _stories = [
-    _StoryData(
-      '\u{1F3B5}',
-      'Worship\nNight',
-      Color(0xFF8B5CF6),
-      'Last Friday we had an incredible night of worship. Over 200 people gathered to lift their voices!',
-      'Feb 21, 2026',
-      AppRoutes.worshipLyrics,
-    ),
-    _StoryData(
-      '\u{1F4D6}',
-      'Bible\nStudy',
-      Color(0xFF3B82F6),
-      'Join us every Wednesday as we dive deeper into the book of Romans this month.',
-      'Every Wednesday',
-      AppRoutes.bible,
-    ),
-    _StoryData(
-      '\u{1F64F}',
-      'Prayer\nWalk',
-      Color(0xFF10B981),
-      'Our community prayer walk through the city brought together 50 faithful intercessors.',
-      'Feb 18, 2026',
-      AppRoutes.prayerRequests,
-    ),
-    _StoryData(
-      '\u{1F476}',
-      'Kids\nSunday',
-      Color(0xFFEC4899),
-      'The children put on an amazing presentation! Check out the highlights from Kids Sunday.',
-      'Every Sunday',
-      AppRoutes.kidsCheckin,
-    ),
-    _StoryData(
-      '\u{1F3A4}',
-      'Guest\nSpeaker',
-      Color(0xFFF59E0B),
-      'Bishop Thomas delivered a powerful message on "Building Strong Foundations" last Sunday.',
-      'Feb 16, 2026',
-      '/sermons/4',
-    ),
-    _StoryData(
-      '\u{2764}\u{FE0F}',
-      'Outreach\nDay',
-      Color(0xFFEF4444),
-      'We served over 300 meals and distributed clothing to families in need across the city.',
-      'Feb 15, 2026',
-      AppRoutes.volunteer,
-    ),
-    _StoryData(
-      '\u{1F3B6}',
-      'Choir\nSpecial',
-      Color(0xFF6366F1),
-      'Our choir performed a special Easter cantata rehearsal preview. Full performance on Easter Sunday!',
-      'Feb 14, 2026',
-      AppRoutes.photoGallery,
-    ),
+  static const _emojis = ['📢', '✝️', '🙏', '❤️', '🌟', '📖', '🎵'];
+  static const _colors = [
+    Color(0xFF8B5CF6),
+    Color(0xFF3B82F6),
+    Color(0xFF10B981),
+    Color(0xFFEC4899),
+    Color(0xFFF59E0B),
+    Color(0xFFEF4444),
+    Color(0xFF6366F1),
   ];
 
-  void _openStory(int index) {
+  _StoryData _fromAnnouncement(Map<String, dynamic> a, int index) {
+    final emoji = _emojis[index % _emojis.length];
+    final color = _colors[index % _colors.length];
+    final title = (a['title'] as String?) ?? '';
+    final words = title.split(' ');
+    final line1 = words.isNotEmpty ? words[0].substring(0, math.min(words[0].length, 8)) : '';
+    final line2 = words.length > 1 ? words[1].substring(0, math.min(words[1].length, 8)) : '';
+    final label = line2.isNotEmpty ? '$line1\n$line2' : line1;
+    final description = (a['content'] as String?) ?? '';
+    final dateLabel = _relativeDate(a['publishedAt'] as String?);
+    return _StoryData(emoji, label, color, description, dateLabel, AppRoutes.announcements);
+  }
+
+  String _relativeDate(String? iso) {
+    if (iso == null) return '';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt).inDays;
+      if (diff == 0) return 'Today';
+      if (diff == 1) return 'Yesterday';
+      return '${diff}d ago';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  void _openStory(List<_StoryData> stories, int index) {
     setState(() => _viewed.add(index));
     final isDark = widget.isDark;
 
@@ -996,7 +994,7 @@ class _HighlightStoriesState extends State<_HighlightStories> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _StoryViewer(
-        stories: _stories,
+        stories: stories,
         initialIndex: index,
         isDark: isDark,
         onClose: () => Navigator.pop(ctx),
@@ -1010,21 +1008,27 @@ class _HighlightStoriesState extends State<_HighlightStories> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.announcements.isEmpty) return const SizedBox.shrink();
+    final stories = widget.announcements
+        .asMap()
+        .entries
+        .map((e) => _fromAnnouncement(e.value, e.key))
+        .toList();
     return SizedBox(
       height: 106,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(
             AppSpacing.sp4, AppSpacing.sp4, AppSpacing.sp4, 0),
-        itemCount: _stories.length,
+        itemCount: stories.length,
         separatorBuilder: (_, _) => const SizedBox(width: AppSpacing.sp3),
         itemBuilder: (_, index) {
-          final s = _stories[index];
+          final s = stories[index];
           return _StoryCircle(
             story: s,
             isDark: widget.isDark,
             isViewed: _viewed.contains(index),
-            onTap: () => _openStory(index),
+            onTap: () => _openStory(stories, index),
           );
         },
       ),
@@ -1442,18 +1446,18 @@ class _StoryData {
 
 class _CampaignProgressCard extends StatelessWidget {
   const _CampaignProgressCard({
+    required this.campaign,
     required this.isDark,
     required this.onTap,
   });
 
+  final FeedCampaign campaign;
   final bool isDark;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    const raised = 187500.0;
-    const goal = 250000.0;
-    const progress = raised / goal;
+    final progress = campaign.progressPercent;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sp4),
@@ -1472,7 +1476,6 @@ class _CampaignProgressCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // Icon
               Container(
                 width: 44,
                 height: 44,
@@ -1486,19 +1489,16 @@ class _CampaignProgressCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: AppSpacing.sp3),
-
-              // Content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('New Youth Center',
+                    Text(campaign.title,
                         style: AppTextStyles.labelMedium.copyWith(
                             color: isDark
                                 ? AppColors.textPrimaryDark
                                 : AppColors.textPrimary)),
                     const SizedBox(height: 4),
-                    // Progress bar
                     ClipRRect(
                       borderRadius: AppRadius.borderRadiusFull,
                       child: SizedBox(
@@ -1526,7 +1526,7 @@ class _CampaignProgressCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${(progress * 100).toInt()}% funded  \u00b7  43 days left',
+                      '${(progress * 100).toInt()}% funded',
                       style: AppTextStyles.bodySmall.copyWith(
                           color: isDark
                               ? AppColors.textSecondaryDark

@@ -2,6 +2,7 @@ import type { Response, NextFunction } from 'express';
 import { chatService } from './chat.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import type { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
@@ -24,7 +25,7 @@ export const chatController = {
   async createConversation(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
 
       const conversation = await chatService.createConversation(userId, churchId, req.body);

@@ -21,38 +21,6 @@ class CampusesScreen extends ConsumerWidget {
     Color(0xFF0891B2),
   ];
 
-  static const _staticCampuses = [
-    _CampusData(
-      name: 'Main Campus',
-      address: '1234 Grace Avenue, Downtown',
-      city: 'Springfield, IL 62701',
-      phone: '(555) 123-4567',
-      pastor: 'Pastor James Wilson',
-      services: ['Sunday 8:00 AM', 'Sunday 10:30 AM', 'Sunday 6:00 PM'],
-      description: 'Our flagship campus in the heart of downtown. Home to our main worship center, youth center, and community outreach programs.',
-      color: Color(0xFF1E40AF),
-    ),
-    _CampusData(
-      name: 'Northside Campus',
-      address: '5678 Maple Drive',
-      city: 'Springfield, IL 62704',
-      phone: '(555) 234-5678',
-      pastor: 'Pastor Rachel Adams',
-      services: ['Sunday 9:00 AM', 'Sunday 11:00 AM'],
-      description: 'A growing community on the north side, known for its family-friendly atmosphere and strong children ministry.',
-      color: Color(0xFF059669),
-    ),
-    _CampusData(
-      name: 'Westside Campus',
-      address: '9012 Oak Street',
-      city: 'Springfield, IL 62707',
-      phone: '(555) 345-6789',
-      pastor: 'Pastor David Kim',
-      services: ['Sunday 10:00 AM', 'Wednesday 7:00 PM'],
-      description: 'Our newest campus serving the west side community with a focus on outreach and community engagement.',
-      color: Color(0xFF7C3AED),
-    ),
-  ];
 
   List<_CampusData> _fromApi(List<Campus> campuses) {
     return campuses.asMap().entries.map((e) {
@@ -80,8 +48,8 @@ class CampusesScreen extends ConsumerWidget {
 
     final campuses = campusesAsync.when(
       loading: () => null,
-      error: (_, _) => _staticCampuses,
-      data: (data) => data.isEmpty ? _staticCampuses : _fromApi(data),
+      error: (_, _) => <_CampusData>[],
+      data: (data) => _fromApi(data),
     );
 
     return Scaffold(

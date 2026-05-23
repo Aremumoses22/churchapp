@@ -1,58 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/giving.dart';
+import '../../core/providers/giving_providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // GIVING CAMPAIGN SCREEN
 //
-// Fundraiser detail with hero image, goal thermometer with animated fill,
-// days remaining countdown, donor list (anonymized), "Give to This Campaign"
-// CTA.
+// Fundraiser detail: goal thermometer with animated fill, days remaining,
+// donor count, description. Data loaded from /giving/campaigns/:id.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class GivingCampaignScreen extends StatefulWidget {
+class GivingCampaignScreen extends ConsumerStatefulWidget {
   const GivingCampaignScreen({super.key, this.campaignId});
 
   final String? campaignId;
 
   @override
-  State<GivingCampaignScreen> createState() => _GivingCampaignScreenState();
+  ConsumerState<GivingCampaignScreen> createState() =>
+      _GivingCampaignScreenState();
 }
 
-class _GivingCampaignScreenState extends State<GivingCampaignScreen>
+class _GivingCampaignScreenState extends ConsumerState<GivingCampaignScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _thermometerCtrl;
   late Animation<double> _fillAnim;
-
-  // Mock campaign data
-  final _campaign = const _CampaignData(
-    title: 'New Youth Center',
-    subtitle: 'Building a space for the next generation',
-    description:
-        "Help us build a state-of-the-art youth center where young people "
-        "can grow in faith, develop leadership skills, and build lasting "
-        "community. The facility will include a worship hall, mentoring rooms, "
-        "a game lounge, and a study area.",
-    goalAmount: 250000,
-    raisedAmount: 187500,
-    daysRemaining: 43,
-    donorCount: 312,
-    startDate: '1 Dec 2025',
-    endDate: '15 Mar 2026',
-    heroEmoji: '🏗️',
-  );
-
-  final _donors = const [
-    _DonorEntry(name: 'Anonymous', amount: 5000, timeAgo: '2h ago'),
-    _DonorEntry(name: 'John D.', amount: 2500, timeAgo: '5h ago'),
-    _DonorEntry(name: 'Anonymous', amount: 1000, timeAgo: '1d ago'),
-    _DonorEntry(name: 'Sarah M.', amount: 500, timeAgo: '1d ago'),
-    _DonorEntry(name: 'Anonymous', amount: 250, timeAgo: '2d ago'),
-    _DonorEntry(name: 'Grace K.', amount: 100, timeAgo: '2d ago'),
-    _DonorEntry(name: 'David L.', amount: 1500, timeAgo: '3d ago'),
-    _DonorEntry(name: 'Anonymous', amount: 750, timeAgo: '4d ago'),
-  ];
+  double _lastProgress = 0.0;
 
   @override
   void initState() {
@@ -61,17 +36,18 @@ class _GivingCampaignScreenState extends State<GivingCampaignScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     );
-    _fillAnim = Tween<double>(
-      begin: 0.0,
-      end: _campaign.raisedAmount / _campaign.goalAmount,
-    ).animate(CurvedAnimation(
-      parent: _thermometerCtrl,
-      curve: Curves.easeOutCubic,
-    ));
-    // Start animation after a frame
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _thermometerCtrl.forward();
-    });
+    _fillAnim = Tween<double>(begin: 0.0, end: 0.0).animate(
+      CurvedAnimation(parent: _thermometerCtrl, curve: Curves.easeOutCubic),
+    );
+  }
+
+  void _startAnimation(double progress) {
+    if (progress == _lastProgress) return;
+    _lastProgress = progress;
+    _fillAnim = Tween<double>(begin: 0.0, end: progress).animate(
+      CurvedAnimation(parent: _thermometerCtrl, curve: Curves.easeOutCubic),
+    );
+    _thermometerCtrl.forward(from: 0.0);
   }
 
   @override
@@ -83,207 +59,313 @@ class _GivingCampaignScreenState extends State<GivingCampaignScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final progress = _campaign.raisedAmount / _campaign.goalAmount;
+    final id = widget.campaignId ?? '';
+    final campaignAsync = ref.watch(givingCampaignProvider(id));
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      body: CustomScrollView(
-        slivers: [
-          // ── Hero header ─────────────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 220,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+      body: campaignAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Scaffold(
+          appBar: AppFilledAppBar(title: 'Campaign', showBack: true),
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off_outlined, size: 48),
+                const SizedBox(height: AppSpacing.sp3),
+                Text('Failed to load campaign',
+                    style: AppTextStyles.bodyMedium),
+                const SizedBox(height: AppSpacing.sp3),
+                AppSecondaryButton(
+                  label: 'Retry',
+                  onPressed: () =>
+                      ref.invalidate(givingCampaignProvider(id)),
+                ),
+              ],
             ),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.share_outlined, color: Colors.white),
-                onPressed: () {},
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: BoxDecoration(gradient: AppGradients.hero),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(height: 40),
-                      Text(_campaign.heroEmoji,
-                          style: const TextStyle(fontSize: 56)),
-                      const SizedBox(height: AppSpacing.sp2),
-                      Text(_campaign.title,
-                          style: AppTextStyles.headingLarge
-                              .copyWith(color: Colors.white)),
-                      const SizedBox(height: 4),
-                      Text(_campaign.subtitle,
-                          style: AppTextStyles.bodyMedium
-                              .copyWith(color: Colors.white70)),
-                    ],
-                  ),
+          ),
+        ),
+        data: (campaign) {
+          if (campaign == null) {
+            return Scaffold(
+              appBar: AppFilledAppBar(title: 'Campaign', showBack: true),
+              body: const Center(child: Text('Campaign not found')),
+            );
+          }
+          WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _startAnimation(campaign.progressPercent));
+          return _CampaignBody(
+            campaign: campaign,
+            fillAnim: _fillAnim,
+            thermometerCtrl: _thermometerCtrl,
+            isDark: isDark,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Campaign body (extracted so it only builds once data is available) ────────
+
+class _CampaignBody extends StatelessWidget {
+  const _CampaignBody({
+    required this.campaign,
+    required this.fillAnim,
+    required this.thermometerCtrl,
+    required this.isDark,
+  });
+
+  final GivingCampaign campaign;
+  final Animation<double> fillAnim;
+  final AnimationController thermometerCtrl;
+  final bool isDark;
+
+  String _formatNum(double n) {
+    if (n >= 1000000) {
+      return '${(n / 1000000).toStringAsFixed(n % 1000000 == 0 ? 0 : 1)}M';
+    }
+    if (n >= 1000) {
+      return '${(n / 1000).toStringAsFixed(n % 1000 == 0 ? 0 : 1)}K';
+    }
+    return n.toInt().toString();
+  }
+
+  int _daysRemaining() {
+    if (campaign.endDate == null) return 0;
+    try {
+      final end = DateTime.parse(campaign.endDate!);
+      return end.difference(DateTime.now()).inDays.clamp(0, 9999);
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  String _formatDate(String? iso) {
+    if (iso == null) return 'N/A';
+    try {
+      final dt = DateTime.parse(iso);
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      return '${months[dt.month - 1]} ${dt.day}, ${dt.year}';
+    } catch (_) {
+      return iso;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = campaign.progressPercent;
+    final days = _daysRemaining();
+
+    return CustomScrollView(
+      slivers: [
+        // ── Hero header ────────────────────────────────────────────────
+        SliverAppBar(
+          expandedHeight: 220,
+          pinned: true,
+          backgroundColor: AppColors.primary,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.share_outlined, color: Colors.white),
+              onPressed: () {},
+            ),
+          ],
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              decoration: BoxDecoration(gradient: AppGradients.hero),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 40),
+                    if (campaign.imageUrl != null)
+                      ClipRRect(
+                        borderRadius: AppRadius.borderRadiusMd,
+                        child: Image.network(
+                          campaign.imageUrl!,
+                          height: 80,
+                          width: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => const Text(
+                            '🏗️',
+                            style: TextStyle(fontSize: 56),
+                          ),
+                        ),
+                      )
+                    else
+                      const Text('🏗️', style: TextStyle(fontSize: 56)),
+                    const SizedBox(height: AppSpacing.sp2),
+                    Text(campaign.title,
+                        style: AppTextStyles.headingLarge
+                            .copyWith(color: Colors.white),
+                        textAlign: TextAlign.center),
+                  ],
                 ),
               ),
             ),
           ),
+        ),
 
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenHorizontalPadding),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                const SizedBox(height: AppSpacing.sp5),
+        SliverPadding(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.screenHorizontalPadding),
+          sliver: SliverList(
+            delegate: SliverChildListDelegate([
+              const SizedBox(height: AppSpacing.sp5),
 
-                // ── Goal thermometer ─────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sp5),
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.cardDark : AppColors.surface,
-                    borderRadius: AppRadius.borderRadiusLg,
-                    boxShadow: isDark ? AppShadows.smDark : AppShadows.sm,
-                  ),
-                  child: Column(
-                    children: [
-                      // Raised / Goal
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Raised',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondary)),
-                              Text(
-                                  '\$${_formatNum(_campaign.raisedAmount.toInt())}',
-                                  style: AppTextStyles.headingLarge.copyWith(
-                                      color: AppColors.success)),
-                            ],
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text('Goal',
-                                  style: AppTextStyles.labelSmall.copyWith(
-                                      color: isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondary)),
-                              Text(
-                                  '\$${_formatNum(_campaign.goalAmount.toInt())}',
-                                  style: AppTextStyles.headingMedium.copyWith(
-                                      color: isDark
-                                          ? AppColors.textPrimaryDark
-                                          : AppColors.textPrimary)),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: AppSpacing.sp4),
-
-                      // Animated progress bar
-                      AnimatedBuilder(
-                        animation: _fillAnim,
-                        builder: (context, _) {
-                          return Column(
-                            children: [
-                              ClipRRect(
-                                borderRadius: AppRadius.borderRadiusFull,
-                                child: SizedBox(
-                                  height: 14,
-                                  child: Stack(
-                                    children: [
-                                      // BG
-                                      Container(
+              // ── Goal thermometer ───────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(AppSpacing.sp5),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.cardDark : AppColors.surface,
+                  borderRadius: AppRadius.borderRadiusLg,
+                  boxShadow: isDark ? AppShadows.smDark : AppShadows.sm,
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Raised',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondary)),
+                            Text(
+                              '₦${_formatNum(campaign.raisedAmount)}',
+                              style: AppTextStyles.headingLarge
+                                  .copyWith(color: AppColors.success),
+                            ),
+                          ],
+                        ),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text('Goal',
+                                style: AppTextStyles.labelSmall.copyWith(
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondary)),
+                            Text(
+                              '₦${_formatNum(campaign.goalAmount)}',
+                              style: AppTextStyles.headingMedium.copyWith(
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimary),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sp4),
+                    AnimatedBuilder(
+                      animation: fillAnim,
+                      builder: (context, _) {
+                        return Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: AppRadius.borderRadiusFull,
+                              child: SizedBox(
+                                height: 14,
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? AppColors.borderDark
+                                            : AppColors.inputFill,
+                                      ),
+                                    ),
+                                    FractionallySizedBox(
+                                      widthFactor: fillAnim.value,
+                                      child: Container(
                                         decoration: BoxDecoration(
-                                          color: isDark
-                                              ? AppColors.borderDark
-                                              : AppColors.inputFill,
+                                          gradient: LinearGradient(colors: [
+                                            AppColors.success,
+                                            AppColors.success
+                                                .withValues(alpha: 0.75),
+                                            AppColors.gold,
+                                          ]),
                                         ),
                                       ),
-                                      // Fill
-                                      FractionallySizedBox(
-                                        widthFactor: _fillAnim.value,
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                AppColors.success,
-                                                AppColors.success
-                                                    .withValues(alpha: 0.75),
-                                                AppColors.gold,
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.sp2),
-                              Text(
-                                '${(_fillAnim.value * 100).toInt()}% funded',
-                                style: AppTextStyles.labelSmall.copyWith(
-                                    color: AppColors.success,
-                                    fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: AppSpacing.sp4),
-
-                // ── Countdown row ────────────────────────────────────
-                Row(
-                  children: [
-                    _CountdownPill(
-                      icon: Icons.timer_outlined,
-                      value: '${_campaign.daysRemaining}',
-                      label: 'Days Left',
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: AppSpacing.sp3),
-                    _CountdownPill(
-                      icon: Icons.people_outline,
-                      value: '${_campaign.donorCount}',
-                      label: 'Donors',
-                      isDark: isDark,
-                    ),
-                    const SizedBox(width: AppSpacing.sp3),
-                    _CountdownPill(
-                      icon: Icons.show_chart,
-                      value: '${(progress * 100).toInt()}%',
-                      label: 'Complete',
-                      isDark: isDark,
+                            ),
+                            const SizedBox(height: AppSpacing.sp2),
+                            Text(
+                              '${(fillAnim.value * 100).toInt()}% funded',
+                              style: AppTextStyles.labelSmall.copyWith(
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: AppSpacing.sp6),
+              const SizedBox(height: AppSpacing.sp4),
 
-                // ── About ────────────────────────────────────────────
-                Text('About This Campaign',
-                    style: AppTextStyles.headingSmall.copyWith(
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimary)),
-                const SizedBox(height: AppSpacing.sp2),
-                Text(_campaign.description,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondary,
-                        height: 1.6)),
+              // ── Stats row ──────────────────────────────────────────
+              Row(
+                children: [
+                  _StatPill(
+                    icon: Icons.timer_outlined,
+                    value: '$days',
+                    label: 'Days Left',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: AppSpacing.sp3),
+                  _StatPill(
+                    icon: Icons.people_outline,
+                    value: '${campaign.donorCount}',
+                    label: 'Donors',
+                    isDark: isDark,
+                  ),
+                  const SizedBox(width: AppSpacing.sp3),
+                  _StatPill(
+                    icon: Icons.show_chart,
+                    value: '${(progress * 100).toInt()}%',
+                    label: 'Complete',
+                    isDark: isDark,
+                  ),
+                ],
+              ),
 
+              const SizedBox(height: AppSpacing.sp6),
+
+              // ── Description ────────────────────────────────────────
+              Text('About This Campaign',
+                  style: AppTextStyles.headingSmall.copyWith(
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimary)),
+              const SizedBox(height: AppSpacing.sp2),
+              Text(
+                campaign.description ?? 'No description available.',
+                style: AppTextStyles.bodyMedium.copyWith(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondary,
+                    height: 1.6),
+              ),
+
+              if (campaign.startDate != null || campaign.endDate != null) ...[
                 const SizedBox(height: AppSpacing.sp2),
                 Row(
                   children: [
@@ -294,106 +376,39 @@ class _GivingCampaignScreenState extends State<GivingCampaignScreen>
                             : AppColors.textDisabled),
                     const SizedBox(width: 6),
                     Text(
-                        '${_campaign.startDate} — ${_campaign.endDate}',
-                        style: AppTextStyles.bodySmall.copyWith(
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textDisabled)),
+                      '${_formatDate(campaign.startDate)} — ${_formatDate(campaign.endDate)}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textDisabled),
+                    ),
                   ],
                 ),
+              ],
 
-                const SizedBox(height: AppSpacing.sp6),
+              const SizedBox(height: AppSpacing.sp8),
 
-                // ── Recent donors ────────────────────────────────────
-                AppSectionHeader(
-                  title: 'Recent Donors',
-                  actionLabel: 'View All',
-                  onAction: () {},
-                ),
-                const SizedBox(height: AppSpacing.sp3),
+              // ── CTA ────────────────────────────────────────────────
+              AppPrimaryButton(
+                label: 'Give to This Campaign',
+                icon: const Icon(Icons.favorite_outline,
+                    color: Colors.white, size: 18),
+                onPressed: () => Navigator.pop(context),
+              ),
 
-                ..._donors.map((d) => _DonorTile(donor: d, isDark: isDark)),
-
-                const SizedBox(height: AppSpacing.sp8),
-
-                // ── CTA button ───────────────────────────────────────
-                AppPrimaryButton(
-                  label: 'Give to This Campaign',
-                  icon: const Icon(Icons.favorite_outline,
-                      color: Colors.white, size: 18),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Opening giving form...'),
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: AppRadius.borderRadiusMd),
-                      ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: AppSpacing.sp10),
-              ]),
-            ),
+              const SizedBox(height: AppSpacing.sp10),
+            ]),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
-
-  String _formatNum(int n) {
-    if (n >= 1000) {
-      return '${(n / 1000).toStringAsFixed(n % 1000 == 0 ? 0 : 1)}K';
-    }
-    return '$n';
-  }
 }
 
-// ── Data classes ────────────────────────────────────────────────────────────
+// ── Stat pill widget ─────────────────────────────────────────────────────────
 
-class _CampaignData {
-  const _CampaignData({
-    required this.title,
-    required this.subtitle,
-    required this.description,
-    required this.goalAmount,
-    required this.raisedAmount,
-    required this.daysRemaining,
-    required this.donorCount,
-    required this.startDate,
-    required this.endDate,
-    required this.heroEmoji,
-  });
-
-  final String title;
-  final String subtitle;
-  final String description;
-  final double goalAmount;
-  final double raisedAmount;
-  final int daysRemaining;
-  final int donorCount;
-  final String startDate;
-  final String endDate;
-  final String heroEmoji;
-}
-
-class _DonorEntry {
-  const _DonorEntry({
-    required this.name,
-    required this.amount,
-    required this.timeAgo,
-  });
-
-  final String name;
-  final int amount;
-  final String timeAgo;
-}
-
-// ── Widgets ─────────────────────────────────────────────────────────────────
-
-class _CountdownPill extends StatelessWidget {
-  const _CountdownPill({
+class _StatPill extends StatelessWidget {
+  const _StatPill({
     required this.icon,
     required this.value,
     required this.label,
@@ -422,8 +437,9 @@ class _CountdownPill extends StatelessWidget {
             const SizedBox(height: 4),
             Text(value,
                 style: AppTextStyles.bodyLargeSemiBold.copyWith(
-                    color:
-                        isDark ? AppColors.textPrimaryDark : AppColors.textPrimary)),
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimary)),
             Text(label,
                 style: AppTextStyles.bodySmall.copyWith(
                     color: isDark
@@ -432,62 +448,6 @@ class _CountdownPill extends StatelessWidget {
                     fontSize: 10)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DonorTile extends StatelessWidget {
-  const _DonorTile({required this.donor, required this.isDark});
-
-  final _DonorEntry donor;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final isAnonymous = donor.name == 'Anonymous';
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sp2),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: isAnonymous
-                ? (isDark ? AppColors.borderDark : AppColors.inputFill)
-                : AppColors.primary.withValues(alpha: 0.1),
-            child: Icon(
-              isAnonymous ? Icons.person_off_outlined : Icons.person_outline,
-              size: 16,
-              color: isAnonymous ? AppColors.textDisabled : AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sp3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  donor.name,
-                  style: AppTextStyles.labelMedium.copyWith(
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimary,
-                      fontStyle:
-                          isAnonymous ? FontStyle.italic : FontStyle.normal),
-                ),
-                Text(donor.timeAgo,
-                    style: AppTextStyles.bodySmall.copyWith(
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textDisabled,
-                        fontSize: 10)),
-              ],
-            ),
-          ),
-          Text('\$${donor.amount}',
-              style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.success, fontWeight: FontWeight.w700)),
-        ],
       ),
     );
   }

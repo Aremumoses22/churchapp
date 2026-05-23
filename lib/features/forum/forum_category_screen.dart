@@ -66,14 +66,20 @@ class _ForumCategoryScreenState extends ConsumerState<ForumCategoryScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final catState = ref.watch(categoryThreadNotifierProvider(widget.categoryId));
-    final meta = catState.meta ??
-        const ForumCategory(
-          id: '',
-          label: 'Forum',
-          icon: Icons.forum_outlined,
-          color: Color(0xFF6B7280),
-          threadCount: 0,
-          description: 'Discussion forum.',
+    const fallbackMeta = ForumCategory(
+      id: '',
+      label: 'Forum',
+      icon: Icons.forum_outlined,
+      color: Color(0xFF6B7280),
+      threadCount: 0,
+      description: 'Discussion forum.',
+    );
+    final meta = ref.watch(forumCategoriesProvider).maybeWhen(
+          data: (cats) => cats.cast<ForumCategory?>().firstWhere(
+                (c) => c?.id == widget.categoryId,
+                orElse: () => null,
+              ) ?? fallbackMeta,
+          orElse: () => fallbackMeta,
         );
     final filteredThreads = _filterThreads(catState.threads);
 

@@ -1,514 +1,262 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/media.dart';
+import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
 // PHOTO GALLERY SCREEN
 //
-// Masonry grid of church event photos, tap to full-screen lightbox with
-// swipe, download/share actions.
+// Albums loaded from GET /media/albums. Tap album to view photos.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class PhotoGalleryScreen extends StatefulWidget {
+class PhotoGalleryScreen extends ConsumerWidget {
   const PhotoGalleryScreen({super.key});
 
   @override
-  State<PhotoGalleryScreen> createState() => _PhotoGalleryScreenState();
-}
-
-class _PhotoGalleryScreenState extends State<PhotoGalleryScreen> {
-  int _selectedAlbum = 0;
-
-  static const _albums = [
-    'All',
-    'Sunday Services',
-    'Youth Camp 2024',
-    'Easter Celebration',
-    'Christmas Concert',
-    'Community Outreach',
-    'Baptisms',
-  ];
-
-  // Mock photo data — using placeholder colors + icons
-  static final _photos = List.generate(24, (i) {
-    final albumIndex = (i % 6) + 1;
-    return _PhotoData(
-      id: 'photo_$i',
-      album: _albums[albumIndex],
-      date: DateTime.now().subtract(Duration(days: i * 3)),
-      aspectRatio: i % 3 == 0 ? 1.0 : (i % 3 == 1 ? 0.75 : 1.3),
-      colorSeed: i,
-    );
-  });
-
-  List<_PhotoData> get _filtered {
-    if (_selectedAlbum == 0) return _photos;
-    return _photos.where((p) => p.album == _albums[_selectedAlbum]).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final albumsAsync = ref.watch(albumsProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
-      appBar: AppFilledAppBar(
-        title: 'Photo Gallery',
-        showBack: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.camera_alt_outlined,
-                color: Colors.white, size: 22),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                content: const Text('Upload photos coming soon!'),
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                    borderRadius: AppRadius.borderRadiusSm),
-              ));
-            },
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Album chips ──────────────────────────────────────────
-          const SizedBox(height: AppSpacing.sp3),
-          SizedBox(
-            height: 40,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.screenHorizontalPadding),
-              itemCount: _albums.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: AppSpacing.sp2),
-              itemBuilder: (context, i) {
-                final sel = _selectedAlbum == i;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedAlbum = i),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sp4),
-                    decoration: BoxDecoration(
-                      color: sel
-                          ? (isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary)
-                          : (isDark
-                              ? AppColors.cardDark
-                              : AppColors.inputFill),
-                      borderRadius: AppRadius.borderRadiusFull,
-                      border: sel
-                          ? null
-                          : Border.all(
-                              color: isDark
-                                  ? AppColors.borderDark
-                                  : AppColors.inputBorder),
-                    ),
-                    child: Center(
-                      child: Text(_albums[i],
-                          style: AppTextStyles.labelSmall.copyWith(
-                              color: sel
-                                  ? Colors.white
-                                  : (isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondary),
-                              fontSize: 12)),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: AppSpacing.sp2),
-
-          // Photo count
-          Padding(
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenHorizontalPadding),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                '${_filtered.length} photos',
-                style: AppTextStyles.bodySmall.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textDisabled),
+      appBar: AppFilledAppBar(title: 'Photo Gallery', showBack: true),
+      body: albumsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, s) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 48),
+              const SizedBox(height: AppSpacing.sp3),
+              Text('Failed to load albums', style: AppTextStyles.bodyMedium),
+              const SizedBox(height: AppSpacing.sp3),
+              AppSecondaryButton(
+                label: 'Retry',
+                onPressed: () => ref.invalidate(albumsProvider),
               ),
-            ),
+            ],
           ),
-
-          const SizedBox(height: AppSpacing.sp3),
-
-          // ── Masonry grid ─────────────────────────────────────────
-          Expanded(
-            child: _filtered.isEmpty
-                ? Center(
-                    child: AppEmptyState(
-                      icon: Icons.photo_library_outlined,
-                      title: 'No Photos',
-                      subtitle: 'This album is empty',
-                    ),
-                  )
-                : _MasonryGrid(
-                    photos: _filtered,
-                    isDark: isDark,
-                    onPhotoTap: (index) =>
-                        _openLightbox(context, index, isDark),
-                  ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openLightbox(BuildContext context, int initialIndex, bool isDark) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        opaque: false,
-        barrierColor: Colors.black87,
-        pageBuilder: (_, __, ___) => _LightboxView(
-          photos: _filtered,
-          initialIndex: initialIndex,
-          isDark: isDark,
         ),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
+        data: (albums) => albums.isEmpty
+            ? const AppEmptyState(
+                icon: Icons.photo_library_outlined,
+                title: 'No albums yet',
+                subtitle: 'Church photo albums will appear here.',
+              )
+            : GridView.builder(
+                padding: const EdgeInsets.all(AppSpacing.sp4),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: AppSpacing.sp3,
+                  mainAxisSpacing: AppSpacing.sp3,
+                  childAspectRatio: 0.85,
+                ),
+                itemCount: albums.length,
+                itemBuilder: (context, i) => _AlbumCard(
+                  album: albums[i],
+                  isDark: isDark,
+                  onTap: () => _openAlbum(context, ref, albums[i], isDark),
+                ),
+              ),
+      ),
+    );
+  }
+
+  void _openAlbum(BuildContext context, WidgetRef ref,
+      PhotoAlbum album, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        maxChildSize: 0.95,
+        minChildSize: 0.5,
+        builder: (ctx2, scroll) => Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.cardDark : AppColors.surface,
+            borderRadius: AppRadius.borderRadiusXlTop,
+          ),
+          child: _AlbumPhotosSheet(
+            album: album,
+            isDark: isDark,
+            scrollController: scroll,
+          ),
+        ),
       ),
     );
   }
 }
 
-// ── Data ─────────────────────────────────────────────────────────────────────
+// ── Album card ────────────────────────────────────────────────────────────────
 
-class _PhotoData {
-  const _PhotoData({
-    required this.id,
+class _AlbumCard extends StatelessWidget {
+  const _AlbumCard({
     required this.album,
-    required this.date,
-    required this.aspectRatio,
-    required this.colorSeed,
-  });
-
-  final String id;
-  final String album;
-  final DateTime date;
-  final double aspectRatio;
-  final int colorSeed;
-}
-
-// ── Masonry Grid ─────────────────────────────────────────────────────────────
-
-class _MasonryGrid extends StatelessWidget {
-  const _MasonryGrid({
-    required this.photos,
     required this.isDark,
-    required this.onPhotoTap,
+    required this.onTap,
   });
 
-  final List<_PhotoData> photos;
+  final PhotoAlbum album;
   final bool isDark;
-  final void Function(int index) onPhotoTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    // Simple 2-column layout
-    final col1 = <int>[];
-    final col2 = <int>[];
-    double h1 = 0, h2 = 0;
-
-    for (int i = 0; i < photos.length; i++) {
-      final height = 1.0 / photos[i].aspectRatio;
-      if (h1 <= h2) {
-        col1.add(i);
-        h1 += height;
-      } else {
-        col2.add(i);
-        h2 += height;
-      }
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.screenHorizontalPadding),
-      child: IntrinsicHeight(
-        child: Row(
+    return AppTapAnimation(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.cardDark : AppColors.surface,
+          borderRadius: AppRadius.borderRadiusLg,
+          boxShadow: isDark ? AppShadows.smDark : AppShadows.sm,
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(child: _buildColumn(col1)),
-            const SizedBox(width: AppSpacing.sp2),
-            Expanded(child: _buildColumn(col2)),
+            Expanded(
+              child: album.coverUrl != null
+                  ? Image.network(
+                      album.coverUrl!,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (c, e, s) => Container(
+                        color: isDark
+                            ? AppColors.skyDark
+                            : AppColors.inputFill,
+                        child: Center(
+                          child: Icon(Icons.photo_library_outlined,
+                              size: 40,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textDisabled),
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: isDark
+                          ? AppColors.skyDark
+                          : AppColors.inputFill,
+                      child: Center(
+                        child: Icon(Icons.photo_library_outlined,
+                            size: 40,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textDisabled),
+                      ),
+                    ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.sp3),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(album.title,
+                      style: AppTextStyles.labelMedium.copyWith(
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 2),
+                  Text('${album.photoCount} photos',
+                      style: AppTextStyles.bodySmall.copyWith(
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondary,
+                          fontSize: 11)),
+                ],
+              ),
+            ),
           ],
         ),
       ),
     );
   }
-
-  Widget _buildColumn(List<int> indices) {
-    return Column(
-      children: indices
-          .map((i) => Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sp2),
-                child: _PhotoTile(
-                  photo: photos[i],
-                  isDark: isDark,
-                  onTap: () => onPhotoTap(i),
-                ),
-              ))
-          .toList(),
-    );
-  }
 }
 
-class _PhotoTile extends StatelessWidget {
-  const _PhotoTile({
-    required this.photo,
+// ── Album photos sheet ────────────────────────────────────────────────────────
+
+class _AlbumPhotosSheet extends ConsumerWidget {
+  const _AlbumPhotosSheet({
+    required this.album,
     required this.isDark,
-    required this.onTap,
+    required this.scrollController,
   });
 
-  final _PhotoData photo;
+  final PhotoAlbum album;
   final bool isDark;
-  final VoidCallback onTap;
-
-  // Generate a pastel-ish color from seed
-  Color _seedColor() {
-    final hue = (photo.colorSeed * 37.0) % 360;
-    return HSLColor.fromAHSL(1, hue, 0.35, isDark ? 0.25 : 0.85).toColor();
-  }
+  final ScrollController scrollController;
 
   @override
-  Widget build(BuildContext context) {
-    final baseHeight = 120.0 + (photo.colorSeed % 5) * 30.0;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photosAsync = ref.watch(albumPhotosProvider(album.id));
 
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: AppRadius.borderRadiusMd,
-        child: SizedBox(
-          height: baseHeight,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              CachedNetworkImage(
-                imageUrl:
-                    'https://picsum.photos/seed/photo_${photo.id}/400/${baseHeight.toInt()}',
-                fit: BoxFit.cover,
-                placeholder: (_, __) => Container(color: _seedColor()),
-                errorWidget: (_, __, ___) => Container(
-                  color: _seedColor(),
-                  child: Center(
-                    child: Icon(Icons.image_outlined,
-                        size: 32,
-                        color: isDark
-                            ? Colors.white.withValues(alpha: 0.2)
-                            : Colors.black.withValues(alpha: 0.08)),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: 6,
-                left: 6,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.black45,
-                    borderRadius: AppRadius.borderRadiusXs,
-                  ),
-                  child: Text(
-                    photo.album.length > 14
-                        ? '${photo.album.substring(0, 14)}…'
-                        : photo.album,
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: Colors.white, fontSize: 9),
-                  ),
-                ),
-              ),
-            ],
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        Center(
+          child: Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+                color:
+                    isDark ? AppColors.borderDark : AppColors.inactive,
+                borderRadius: AppRadius.borderRadiusFull),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// ── Lightbox ─────────────────────────────────────────────────────────────────
-
-class _LightboxView extends StatefulWidget {
-  const _LightboxView({
-    required this.photos,
-    required this.initialIndex,
-    required this.isDark,
-  });
-
-  final List<_PhotoData> photos;
-  final int initialIndex;
-  final bool isDark;
-
-  @override
-  State<_LightboxView> createState() => _LightboxViewState();
-}
-
-class _LightboxViewState extends State<_LightboxView> {
-  late PageController _pageController;
-  late int _current;
-
-  @override
-  void initState() {
-    super.initState();
-    _current = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  Color _seedColor(int seed) {
-    final hue = (seed * 37.0) % 360;
-    return HSLColor.fromAHSL(1, hue, 0.35, 0.25).toColor();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = widget.photos[_current];
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Swipeable photos
-          PageView.builder(
-            controller: _pageController,
-            itemCount: widget.photos.length,
-            onPageChanged: (i) => setState(() => _current = i),
-            itemBuilder: (_, i) {
-              final p = widget.photos[i];
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.sp6),
-                  child: ClipRRect(
-                    borderRadius: AppRadius.borderRadiusMd,
-                    child: AspectRatio(
-                      aspectRatio: p.aspectRatio,
-                      child: CachedNetworkImage(
-                        imageUrl:
-                            'https://picsum.photos/seed/photo_${p.id}/800/800',
+        Padding(
+          padding: const EdgeInsets.all(AppSpacing.sp4),
+          child: Text(album.title,
+              style: AppTextStyles.headingSmall.copyWith(
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimary)),
+        ),
+        Expanded(
+          child: photosAsync.when(
+            loading: () =>
+                const Center(child: CircularProgressIndicator()),
+            error: (e, s) => Center(
+                child: Text('Failed to load photos',
+                    style: AppTextStyles.bodyMedium)),
+            data: (photos) => photos.isEmpty
+                ? const AppEmptyState(
+                    icon: Icons.photo_outlined,
+                    title: 'No photos',
+                    subtitle: 'This album has no photos yet.',
+                  )
+                : GridView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(AppSpacing.sp3),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 4,
+                      mainAxisSpacing: 4,
+                    ),
+                    itemCount: photos.length,
+                    itemBuilder: (context, i) => ClipRRect(
+                      borderRadius: AppRadius.borderRadiusSm,
+                      child: Image.network(
+                        photos[i].url,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) =>
-                            Container(color: _seedColor(p.colorSeed)),
-                        errorWidget: (_, __, ___) => Container(
-                          color: _seedColor(p.colorSeed),
-                          child: Center(
-                            child: Icon(Icons.image_outlined,
-                                size: 64,
-                                color: Colors.white.withValues(alpha: 0.3)),
-                          ),
+                        errorBuilder: (c, e, s) => Container(
+                          color: isDark
+                              ? AppColors.skyDark
+                              : AppColors.inputFill,
+                          child: const Icon(Icons.broken_image_outlined),
                         ),
                       ),
                     ),
                   ),
-                ),
-              );
-            },
           ),
-
-          // Top bar
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 0,
-            right: 0,
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                const Spacer(),
-                Text(
-                  '${_current + 1} / ${widget.photos.length}',
-                  style: AppTextStyles.labelSmall
-                      .copyWith(color: Colors.white70),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.share_outlined, color: Colors.white),
-                  onPressed: () {},
-                ),
-              ],
-            ),
-          ),
-
-          // Bottom info
-          Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + AppSpacing.sp4,
-            left: AppSpacing.sp6,
-            right: AppSpacing.sp6,
-            child: Column(
-              children: [
-                Text(photo.album,
-                    style: AppTextStyles.labelMedium
-                        .copyWith(color: Colors.white)),
-                const SizedBox(height: 4),
-                Text(
-                  '${photo.date.day}/${photo.date.month}/${photo.date.year}',
-                  style: AppTextStyles.bodySmall
-                      .copyWith(color: Colors.white54),
-                ),
-                const SizedBox(height: AppSpacing.sp4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _LightboxAction(
-                        icon: Icons.download_outlined, label: 'Save'),
-                    const SizedBox(width: AppSpacing.sp8),
-                    _LightboxAction(
-                        icon: Icons.share_outlined, label: 'Share'),
-                    const SizedBox(width: AppSpacing.sp8),
-                    _LightboxAction(
-                        icon: Icons.favorite_border, label: 'Like'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LightboxAction extends StatelessWidget {
-  const _LightboxAction({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withValues(alpha: 0.15),
-          ),
-          child: Icon(icon, color: Colors.white, size: 20),
         ),
-        const SizedBox(height: 4),
-        Text(label,
-            style: AppTextStyles.bodySmall
-                .copyWith(color: Colors.white70, fontSize: 10)),
       ],
     );
   }

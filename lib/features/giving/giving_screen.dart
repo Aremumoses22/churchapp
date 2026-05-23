@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/models/giving.dart';
 import '../../core/navigation/app_routes.dart';
 import '../../core/providers/giving_providers.dart';
+import '../../core/repositories/giving_repository.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
 
@@ -73,18 +74,53 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
     super.dispose();
   }
 
+  String _resolvePaymentMethodType(int index, List<PaymentMethod> saved) {
+    if (index < saved.length) return saved[index].type;
+    if (index == saved.length) return 'CARD';
+    if (index == saved.length + 1) return 'BANK_TRANSFER';
+    return 'WALLET';
+  }
+
+  void _submit(
+    GivingState gState,
+    List<PaymentMethod> savedMethods,
+  ) {
+    final categories = ref.read(givingCategoriesProvider).maybeWhen(
+          data: (cats) => cats,
+          orElse: () => <GivingCategory>[],
+        );
+    if (categories.isEmpty) return;
+
+    final cat = gState.selectedCategoryIndex < categories.length
+        ? categories[gState.selectedCategoryIndex]
+        : categories.first;
+    final methodType =
+        _resolvePaymentMethodType(gState.paymentMethod, savedMethods);
+
+    ref.read(givingNotifierProvider.notifier).reset();
+
+    context.push(
+      '${AppRoutes.givingCheckout}'
+      '?amount=${gState.currentAmount}'
+      '&categoryId=${Uri.encodeComponent(cat.id)}'
+      '&categoryName=${Uri.encodeComponent(cat.name)}'
+      '&method=${Uri.encodeComponent(methodType)}',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final gState = ref.watch(givingNotifierProvider);
-
-    ref.listen(givingCategoriesProvider, (_, next) {
-      next.whenData((cats) {
-        if (cats.isNotEmpty) {
-          ref.read(givingNotifierProvider.notifier).updateCategoriesFromApi(cats);
-        }
-      });
-    });
+    final categoryLabels = ref.watch(givingCategoriesProvider).maybeWhen(
+      data: (cats) => cats.map((c) => c.name).toList(),
+      orElse: () => <String>['General Offering'],
+    );
+    final savedMethods = ref.watch(givingPaymentMethodsProvider).maybeWhen(
+      data: (methods) => methods,
+      orElse: () => <PaymentMethod>[],
+    );
+    final amountPresets = GivingRepository.amountPresets;
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -120,8 +156,8 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                 _sectionLabel('Select Category', isDark),
                 const SizedBox(height: AppSpacing.sp3),
                 AppFilterChips(
-                  labels: gState.categories,
-                  selectedIndex: gState.selectedCategory,
+                  labels: categoryLabels,
+                  selectedIndex: gState.selectedCategoryIndex,
                   onSelected: (i) => ref
                       .read(givingNotifierProvider.notifier)
                       .selectCategory(i),
@@ -156,7 +192,7 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                   spacing: AppSpacing.sp3,
                   runSpacing: AppSpacing.sp3,
                   children: [
-                    ...gState.amountPresets.map((a) => AppGivingAmountChip(
+                    ...amountPresets.map((a) => AppGivingAmountChip(
                           label: _formatNaira(a),
                           isSelected:
                               !gState.isCustom && gState.selectedAmount == a,
@@ -270,25 +306,25 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                 const SizedBox(height: AppSpacing.sp6),
 
                 // ── Saved Payment Methods ─────────────────────────────
-                _sectionLabel('Saved Cards', isDark),
-                const SizedBox(height: AppSpacing.sp3),
-                ...List.generate(gState.savedCards.length, (i) {
-                  final card = gState.savedCards[i];
-                  return Padding(
-                    padding: const EdgeInsets.only(
-                        bottom: AppSpacing.sp2),
-                    child: _SavedCardOption(
-                      card: card,
-                      isSelected: gState.paymentMethod == i,
-                      isDark: isDark,
-                      onTap: () => ref
-                          .read(givingNotifierProvider.notifier)
-                          .setPaymentMethod(i),
-                    ),
-                  );
-                }),
-
-                const SizedBox(height: AppSpacing.sp4),
+                if (savedMethods.isNotEmpty) ...[
+                  _sectionLabel('Saved Cards', isDark),
+                  const SizedBox(height: AppSpacing.sp3),
+                  ...List.generate(savedMethods.length, (i) {
+                    final card = _methodToCard(savedMethods[i]);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sp2),
+                      child: _SavedCardOption(
+                        card: card,
+                        isSelected: gState.paymentMethod == i,
+                        isDark: isDark,
+                        onTap: () => ref
+                            .read(givingNotifierProvider.notifier)
+                            .setPaymentMethod(i),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: AppSpacing.sp4),
+                ],
 
                 // ── Other Payment Methods ─────────────────────────────
                 _sectionLabel('Other Methods', isDark),
@@ -301,11 +337,11 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                   label: 'New Card',
                   sub: 'Add a new debit or credit card',
                   isSelected:
-                      gState.paymentMethod == gState.savedCards.length,
+                      gState.paymentMethod == savedMethods.length,
                   isDark: isDark,
                   onTap: () => ref
                       .read(givingNotifierProvider.notifier)
-                      .setPaymentMethod(gState.savedCards.length),
+                      .setPaymentMethod(savedMethods.length),
                 ),
                 const SizedBox(height: AppSpacing.sp2),
                 _PaymentOption(
@@ -316,24 +352,24 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                   label: 'Bank Transfer',
                   sub: 'Direct bank payment',
                   isSelected:
-                      gState.paymentMethod == gState.savedCards.length + 1,
+                      gState.paymentMethod == savedMethods.length + 1,
                   isDark: isDark,
                   onTap: () => ref
                       .read(givingNotifierProvider.notifier)
-                      .setPaymentMethod(gState.savedCards.length + 1),
+                      .setPaymentMethod(savedMethods.length + 1),
                 ),
                 const SizedBox(height: AppSpacing.sp2),
                 _PaymentOption(
                   icon: Icons.account_balance_wallet,
                   iconColor: AppColors.gold,
                   label: 'Wallet',
-                  sub: 'Balance: \u20A612,500',
+                  sub: 'Balance: ₦12,500',
                   isSelected:
-                      gState.paymentMethod == gState.savedCards.length + 2,
+                      gState.paymentMethod == savedMethods.length + 2,
                   isDark: isDark,
                   onTap: () => ref
                       .read(givingNotifierProvider.notifier)
-                      .setPaymentMethod(gState.savedCards.length + 2),
+                      .setPaymentMethod(savedMethods.length + 2),
                 ),
 
                 const SizedBox(height: AppSpacing.sp6),
@@ -409,8 +445,7 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
                       ? 'Give ${_formatNaira(gState.currentAmount)}'
                       : 'Select an Amount',
                   onPressed: gState.currentAmount > 0
-                      ? () =>
-                          context.push('/giving/success')
+                      ? () => _submit(gState, savedMethods)
                       : null,
                 ),
               ),
@@ -443,16 +478,48 @@ class _GivingScreenState extends ConsumerState<GivingScreen>
   }
 }
 
+SavedCard _methodToCard(PaymentMethod pm) {
+  const brandColors = {
+    'Visa': Color(0xFF1A1F71),
+    'Mastercard': Color(0xFFEB001B),
+    'Verve': Color(0xFF00754A),
+  };
+  final brand = pm.provider.isNotEmpty ? pm.provider : pm.type;
+  return SavedCard(
+    brand: brand,
+    last4: pm.last4,
+    color: brandColors[brand] ?? const Color(0xFF64748B),
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GIVING IMPACT CARD
 // ═══════════════════════════════════════════════════════════════════════════════
 
-class _GivingImpactCard extends StatelessWidget {
+class _GivingImpactCard extends ConsumerWidget {
   const _GivingImpactCard({required this.isDark});
   final bool isDark;
 
+  String _fmt(double amount) {
+    final v = amount.toInt();
+    final str = v.toString();
+    final buf = StringBuffer('₦');
+    for (var i = 0; i < str.length; i++) {
+      if (i > 0 && (str.length - i) % 3 == 0) buf.write(',');
+      buf.write(str[i]);
+    }
+    return buf.toString();
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summaryAsync = ref.watch(givingSummaryProvider);
+    final summary = summaryAsync.maybeWhen(
+      data: (s) => s,
+      orElse: () => null,
+    );
+    final isLoading = summaryAsync is AsyncLoading;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.sp4),
@@ -484,12 +551,10 @@ class _GivingImpactCard extends StatelessWidget {
             children: [
               Icon(Icons.favorite,
                   size: 18,
-                  color: isDark
-                      ? AppColors.goldLight
-                      : AppColors.gold),
+                  color: isDark ? AppColors.goldLight : AppColors.gold),
               const SizedBox(width: AppSpacing.sp2),
               Text(
-                'Your giving this year has helped...',
+                'Your giving overview',
                 style: AppTextStyles.labelMedium.copyWith(
                   color: isDark
                       ? AppColors.textPrimaryDark
@@ -502,23 +567,23 @@ class _GivingImpactCard extends StatelessWidget {
           Row(
             children: [
               _ImpactMetric(
-                value: '1,240',
-                label: 'Meals served',
-                icon: Icons.restaurant_outlined,
+                value: isLoading ? '—' : _fmt(summary?.thisYear ?? 0),
+                label: 'Year to date',
+                icon: Icons.calendar_today_outlined,
                 isDark: isDark,
               ),
               const SizedBox(width: AppSpacing.sp3),
               _ImpactMetric(
-                value: '85',
-                label: 'Bibles given',
-                icon: Icons.menu_book_outlined,
+                value: isLoading ? '—' : '${summary?.donationCount ?? 0}',
+                label: 'Donations',
+                icon: Icons.volunteer_activism_outlined,
                 isDark: isDark,
               ),
               const SizedBox(width: AppSpacing.sp3),
               _ImpactMetric(
-                value: '32',
-                label: 'Families aided',
-                icon: Icons.people_outlined,
+                value: isLoading ? '—' : _fmt(summary?.thisMonth ?? 0),
+                label: 'This month',
+                icon: Icons.today_outlined,
                 isDark: isDark,
               ),
             ],

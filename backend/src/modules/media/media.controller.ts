@@ -2,12 +2,13 @@ import type { Response, NextFunction } from 'express';
 import type { AuthRequest } from '../../middleware/auth';
 import { mediaService } from './media.service';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const mediaController = {
   // ── Photo Albums ──────────────────────────────────
   async listAlbums(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const page = query.page ?? 1;
@@ -29,7 +30,7 @@ export const mediaController = {
 
   async createAlbum(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const album = await mediaService.createAlbum(churchId, req.body);
       return ApiResponse.created(res, album, 'Album created successfully');
@@ -40,7 +41,7 @@ export const mediaController = {
 
   async getAlbum(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const id = req.params.id as string;
 
@@ -55,7 +56,7 @@ export const mediaController = {
   async addPhoto(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const userId = req.user!.id;
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const albumId = req.params.albumId as string;
 
@@ -69,7 +70,7 @@ export const mediaController = {
   // ── Podcasts ──────────────────────────────────────
   async listPodcasts(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const userId = req.user!.id;
       const query = req.query as any;
@@ -91,7 +92,7 @@ export const mediaController = {
 
   async getPodcast(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const userId = req.user!.id;
       const id = req.params.id as string;
@@ -118,7 +119,7 @@ export const mediaController = {
   // ── Worship Songs ─────────────────────────────────
   async listSongs(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const query = req.query as any;
       const page = query.page ?? 1;
@@ -141,7 +142,7 @@ export const mediaController = {
 
   async getSong(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const id = req.params.id as string;
 

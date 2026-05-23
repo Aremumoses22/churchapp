@@ -2,17 +2,19 @@ import { Response, NextFunction } from 'express';
 import { attendanceService } from './attendance.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const attendanceController = {
   // POST /attendance
   async recordAttendance(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user?.churchId) {
+      const churchId = await resolveChurchId(req);
+      if (!churchId) {
         return ApiResponse.error(res, 'Church context required', 400);
       }
       const result = await attendanceService.recordAttendance(
-        req.user.id,
-        req.user.churchId,
+        req.user!.id,
+        churchId,
         req.body,
       );
       ApiResponse.created(res, result, 'Attendance recorded');
@@ -60,10 +62,11 @@ export const attendanceController = {
   // GET /attendance/stats
   async getStats(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user?.churchId) {
+      const churchId = await resolveChurchId(req);
+      if (!churchId) {
         return ApiResponse.error(res, 'Church context required', 400);
       }
-      const result = await attendanceService.getAttendanceStats(req.user.churchId);
+      const result = await attendanceService.getAttendanceStats(churchId);
       ApiResponse.success(res, result);
     } catch (error) {
       next(error);

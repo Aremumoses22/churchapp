@@ -17,6 +17,7 @@ class ChurchInfo {
     this.coverImageUrl,
     this.socialLinks,
     this.coreValues = const [],
+    this.timeline = const [],
   });
 
   final String id;
@@ -32,6 +33,7 @@ class ChurchInfo {
   final String? coverImageUrl;
   final SocialLinks? socialLinks;
   final List<ChurchCoreValue> coreValues;
+  final List<ChurchTimelineItem> timeline;
 
   factory ChurchInfo.fromJson(Map<String, dynamic> json) {
     return ChurchInfo(
@@ -53,6 +55,31 @@ class ChurchInfo {
               ?.map((e) => ChurchCoreValue.fromJson(e as Map<String, dynamic>))
               .toList() ??
           [],
+      timeline: (json['timeline'] as List?)
+              ?.map((e) =>
+                  ChurchTimelineItem.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class ChurchTimelineItem {
+  const ChurchTimelineItem({
+    required this.year,
+    required this.title,
+    required this.description,
+  });
+
+  final String year;
+  final String title;
+  final String description;
+
+  factory ChurchTimelineItem.fromJson(Map<String, dynamic> json) {
+    return ChurchTimelineItem(
+      year: json['year'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String? ?? '',
     );
   }
 }

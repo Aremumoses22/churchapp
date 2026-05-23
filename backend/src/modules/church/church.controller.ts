@@ -2,12 +2,13 @@ import { Response, NextFunction } from 'express';
 import { churchService } from './church.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const churchController = {
   // GET /church/about
   async getAbout(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const about = await churchService.getAbout(churchId);
       ApiResponse.success(res, about);
@@ -19,7 +20,7 @@ export const churchController = {
   // GET /church/staff
   async getStaff(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const staff = await churchService.getStaff(churchId);
       ApiResponse.success(res, staff);
@@ -31,7 +32,7 @@ export const churchController = {
   // GET /church/campuses
   async getCampuses(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const campuses = await churchService.getCampuses(churchId);
       ApiResponse.success(res, campuses);
@@ -43,7 +44,7 @@ export const churchController = {
   // GET /church/faqs
   async getFAQs(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const faqs = await churchService.getFAQs(churchId);
       ApiResponse.success(res, faqs);
@@ -55,7 +56,7 @@ export const churchController = {
   // POST /church/contact
   async submitContact(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user!.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const result = await churchService.submitContact(churchId, req.user!.id, req.body);
       ApiResponse.success(res, null, result.message);

@@ -2,12 +2,13 @@ import { Response, NextFunction } from 'express';
 import { eventsService } from './events.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const eventsController = {
   // GET /events
   async list(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const result = await eventsService.list(churchId, req.query as any);
       ApiResponse.paginated(res, result.events, result.total, result.page, result.limit);
@@ -19,7 +20,7 @@ export const eventsController = {
   // GET /events/featured
   async getFeatured(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const churchId = req.user?.churchId;
+      const churchId = await resolveChurchId(req);
       if (!churchId) return ApiResponse.error(res, 'Church context required', 400);
       const events = await eventsService.getFeatured(churchId);
       ApiResponse.success(res, events);

@@ -132,21 +132,36 @@ class _AuthInterceptor extends QueuedInterceptor {
 // ──────────────────────────────────────────────────────────────────────────────
 
 class _LogInterceptor extends Interceptor {
+  static const _maxBodyLen = 500;
+
+  String _truncate(Object? body) {
+    if (body == null) return 'null';
+    final str = body.toString();
+    return str.length > _maxBodyLen ? '${str.substring(0, _maxBodyLen)}…' : str;
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     debugPrint('→ ${options.method} ${options.uri}');
+    if (options.data != null) {
+      debugPrint('  body: ${_truncate(options.data)}');
+    }
     handler.next(options);
   }
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     debugPrint('← ${response.statusCode} ${response.requestOptions.uri}');
+    debugPrint('  body: ${_truncate(response.data)}');
     handler.next(response);
   }
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
     debugPrint('✖ ${err.response?.statusCode} ${err.requestOptions.uri}');
+    if (err.response?.data != null) {
+      debugPrint('  error: ${_truncate(err.response!.data)}');
+    }
     handler.next(err);
   }
 }

@@ -44,25 +44,22 @@ class _ForumScreenState extends ConsumerState<ForumScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fState = ref.watch(forumNotifierProvider);
-    final categories = fState.categories;
-    final trendingTopics = fState.trending;
-    final filteredThreads = fState.filteredThreads;
-
-    ref.listen(forumCategoriesProvider, (_, next) {
-      next.whenData((data) {
-        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(categories: data);
-      });
-    });
-    ref.listen(forumTrendingProvider, (_, next) {
-      next.whenData((data) {
-        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(trending: data);
-      });
-    });
-    ref.listen(forumRecentProvider, (_, next) {
-      next.whenData((data) {
-        if (data.isNotEmpty) ref.read(forumNotifierProvider.notifier).updateFromApi(recentThreads: data);
-      });
-    });
+    final categories = ref.watch(forumCategoriesProvider).maybeWhen(
+      data: (d) => d, orElse: () => <ForumCategory>[],
+    );
+    final trendingTopics = ref.watch(forumTrendingProvider).maybeWhen(
+      data: (d) => d, orElse: () => <ForumThread>[],
+    );
+    final recentThreads = ref.watch(forumRecentProvider).maybeWhen(
+      data: (d) => d, orElse: () => <ForumThread>[],
+    );
+    final filteredThreads = fState.searchQuery.isEmpty
+        ? recentThreads
+        : recentThreads.where((t) {
+            final q = fState.searchQuery.toLowerCase();
+            return t.title.toLowerCase().contains(q) ||
+                t.body.toLowerCase().contains(q);
+          }).toList();
 
     return Scaffold(
       appBar: AppFilledAppBar(

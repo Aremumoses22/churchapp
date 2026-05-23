@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { milestonesService } from './milestones.service';
 import { ApiResponse } from '../../utils/apiResponse';
 import { AuthRequest } from '../../middleware/auth';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 export const milestonesController = {
   // GET /milestones
@@ -30,10 +31,11 @@ export const milestonesController = {
   // POST /milestones (admin)
   async createMilestone(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user?.churchId) {
+      const churchId = await resolveChurchId(req);
+      if (!churchId) {
         return ApiResponse.error(res, 'Church context required', 400);
       }
-      const result = await milestonesService.createMilestone(req.user.churchId, req.body);
+      const result = await milestonesService.createMilestone(churchId, req.body);
       ApiResponse.created(res, result, 'Milestone created');
     } catch (error) {
       next(error);
@@ -43,11 +45,12 @@ export const milestonesController = {
   // DELETE /milestones/:id (admin)
   async deleteMilestone(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      if (!req.user?.churchId) {
+      const churchId = await resolveChurchId(req);
+      if (!churchId) {
         return ApiResponse.error(res, 'Church context required', 400);
       }
       const result = await milestonesService.deleteMilestone(
-        req.user.churchId,
+        churchId,
         req.params.id as string,
       );
       ApiResponse.success(res, null, result.message);

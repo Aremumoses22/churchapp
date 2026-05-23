@@ -8,7 +8,7 @@ class HomeFeed {
     this.verseOfTheDay,
     this.latestSermon,
     this.upcomingEvents = const [],
-    this.activeAnnouncements = const [],
+    this.announcements = const [],
     this.prayerRequests = const [],
     this.activeCampaigns = const [],
   });
@@ -17,7 +17,7 @@ class HomeFeed {
   final VerseOfTheDay? verseOfTheDay;
   final Map<String, dynamic>? latestSermon;
   final List<Map<String, dynamic>> upcomingEvents;
-  final List<Map<String, dynamic>> activeAnnouncements;
+  final List<Map<String, dynamic>> announcements;
   final List<Map<String, dynamic>> prayerRequests;
   final List<FeedCampaign> activeCampaigns;
 
@@ -32,7 +32,7 @@ class HomeFeed {
       upcomingEvents: (json['upcomingEvents'] as List?)
               ?.cast<Map<String, dynamic>>() ??
           [],
-      activeAnnouncements: (json['activeAnnouncements'] as List?)
+      announcements: (json['announcements'] as List?)
               ?.cast<Map<String, dynamic>>() ??
           [],
       prayerRequests:

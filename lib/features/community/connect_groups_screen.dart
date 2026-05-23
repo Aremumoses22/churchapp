@@ -25,15 +25,8 @@ class _ConnectGroupsScreenState extends ConsumerState<ConnectGroupsScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cState = ref.watch(communityNotifierProvider);
-
-    ref.listen(groupsProvider, (_, next) {
-      next.whenData((groups) {
-        if (groups.isNotEmpty) {
-          ref.read(communityNotifierProvider.notifier).updateGroupsFromApi(groups);
-        }
-      });
-    });
+    final filterState = ref.watch(connectGroupsNotifierProvider);
+    final groupsAsync = ref.watch(groupsProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -41,99 +34,122 @@ class _ConnectGroupsScreenState extends ConsumerState<ConnectGroupsScreen> {
         title: 'Connect Groups',
         showBack: true,
       ),
-      body: Column(
-        children: [
-          // ── Category chips ───────────────────────────────────────────────
-          SizedBox(
-            height: 48,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.screenHorizontalPadding,
-                vertical: AppSpacing.sp2,
-              ),
-              itemCount: cState.categories.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(width: AppSpacing.sp2),
-              itemBuilder: (context, index) {
-                final isSelected = cState.selectedCategory == index;
-                return GestureDetector(
-                  onTap: () => ref.read(communityNotifierProvider.notifier).selectCategory(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sp4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? (isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary)
-                          : (isDark
-                              ? AppColors.cardDark
-                              : AppColors.inputFill),
-                      borderRadius: AppRadius.borderRadiusFull,
-                      border: isSelected
-                          ? null
-                          : Border.all(
-                              color: isDark
-                                  ? AppColors.borderDark
-                                  : AppColors.inputBorder,
-                              width: 1,
-                            ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        cState.categories[index],
-                        style: AppTextStyles.labelSmall.copyWith(
+      body: groupsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: AppEmptyState(
+            icon: Icons.group_outlined,
+            title: 'Could Not Load Groups',
+            subtitle: 'Please check your connection and try again',
+          ),
+        ),
+        data: (allGroups) {
+          // Build category list from actual API data
+          final rawCats = allGroups.map((g) => g.category).toSet().toList()..sort();
+          final categories = ['All', ...rawCats];
+
+          // Apply selected category filter
+          final selectedCat = filterState.selectedCategory;
+          final filtered = selectedCat == 0
+              ? allGroups
+              : allGroups
+                  .where((g) => g.category == categories[selectedCat])
+                  .toList();
+
+          return Column(
+            children: [
+              // ── Category chips ─────────────────────────────────────────
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.screenHorizontalPadding,
+                    vertical: AppSpacing.sp2,
+                  ),
+                  itemCount: categories.length,
+                  separatorBuilder: (_, _) =>
+                      const SizedBox(width: AppSpacing.sp2),
+                  itemBuilder: (context, index) {
+                    final isSelected = selectedCat == index;
+                    return GestureDetector(
+                      onTap: () => ref
+                          .read(connectGroupsNotifierProvider.notifier)
+                          .selectCategory(index),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sp4,
+                        ),
+                        decoration: BoxDecoration(
                           color: isSelected
-                              ? AppColors.textInverse
+                              ? (isDark
+                                  ? AppColors.primaryLight
+                                  : AppColors.primary)
                               : (isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondary),
+                                  ? AppColors.cardDark
+                                  : AppColors.inputFill),
+                          borderRadius: AppRadius.borderRadiusFull,
+                          border: isSelected
+                              ? null
+                              : Border.all(
+                                  color: isDark
+                                      ? AppColors.borderDark
+                                      : AppColors.inputBorder,
+                                  width: 1,
+                                ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            categories[index],
+                            style: AppTextStyles.labelSmall.copyWith(
+                              color: isSelected
+                                  ? AppColors.textInverse
+                                  : (isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondary),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                    );
+                  },
+                ),
+              ),
 
-          const SizedBox(height: AppSpacing.sp2),
+              const SizedBox(height: AppSpacing.sp2),
 
-          // ── Groups list ──────────────────────────────────────────────────
-          Expanded(
-            child: cState.filteredGroups.isEmpty
-                ? Center(
-                    child: AppEmptyState(
-                      icon: Icons.group_outlined,
-                      title: 'No Groups Found',
-                      subtitle:
-                          'No groups in this category yet',
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.screenHorizontalPadding,
-                    ),
-                    itemCount: cState.filteredGroups.length,
-                    itemBuilder: (context, index) {
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                            bottom: AppSpacing.cardGap),
-                        child: _GroupCard(
-                          group: cState.filteredGroups[index],
-                          isDark: isDark,
-                          onTap: () {
-                            // TODO: navigate to group detail
-                          },
+              // ── Groups list ──────────────────────────────────────────
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: AppEmptyState(
+                          icon: Icons.group_outlined,
+                          title: 'No Groups Found',
+                          subtitle: 'No groups in this category yet',
                         ),
-                      );
-                    },
-                  ),
-          ),
-        ],
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenHorizontalPadding,
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(
+                                bottom: AppSpacing.cardGap),
+                            child: _GroupCard(
+                              group: filtered[index],
+                              isDark: isDark,
+                              onTap: () {},
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

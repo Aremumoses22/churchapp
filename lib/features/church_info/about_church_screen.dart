@@ -30,46 +30,7 @@ class AboutChurchScreen extends ConsumerWidget {
     Color(0xFFEA580C),
   ];
 
-  static const _staticCoreValues = [
-    _CoreValue(
-      icon: Icons.menu_book_outlined,
-      title: 'Biblical Truth',
-      subtitle: 'We are rooted in the Word of God as our ultimate authority.',
-      color: Color(0xFF1E40AF),
-    ),
-    _CoreValue(
-      icon: Icons.favorite_outline,
-      title: 'Authentic Love',
-      subtitle: 'We welcome everyone with genuine love and acceptance.',
-      color: Color(0xFFDC2626),
-    ),
-    _CoreValue(
-      icon: Icons.groups_outlined,
-      title: 'Community',
-      subtitle: 'We believe life is better together in Christ-centered community.',
-      color: Color(0xFF059669),
-    ),
-    _CoreValue(
-      icon: Icons.public_outlined,
-      title: 'Global Impact',
-      subtitle: 'We are called to share the Gospel locally and globally.',
-      color: Color(0xFFF59E0B),
-    ),
-    _CoreValue(
-      icon: Icons.trending_up,
-      title: 'Spiritual Growth',
-      subtitle: 'We are committed to growing deeper in our relationship with God.',
-      color: Color(0xFF7C3AED),
-    ),
-  ];
 
-  static const _timelineItems = [
-    _TimelineData(year: '1998', title: 'The Beginning', description: 'Started as a small Bible study group of 12 people meeting in a living room.'),
-    _TimelineData(year: '2003', title: 'First Building', description: 'Moved into our first church building with 150 members.'),
-    _TimelineData(year: '2010', title: 'Community Expansion', description: 'Launched outreach programs and grew to over 800 members.'),
-    _TimelineData(year: '2018', title: 'Multi-Campus', description: 'Opened our second and third campuses to reach more communities.'),
-    _TimelineData(year: '2024', title: 'Digital Ministry', description: 'Launched online services and this app to connect with members worldwide.'),
-  ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -81,14 +42,14 @@ class AboutChurchScreen extends ConsumerWidget {
     final mission = church?.mission ?? 'To know God, grow in faith, and make Him known to every generation.';
     final vision = church?.vision ?? 'We envision a community transformed by the love of Jesus Christ, where every person discovers their purpose, grows in their faith, and impacts the world around them.';
 
-    final coreValues = (church != null && church.coreValues.isNotEmpty)
+    final coreValues = church != null && church.coreValues.isNotEmpty
         ? church.coreValues.asMap().entries.map((e) => _CoreValue(
               icon: _kValueIcons[e.key % _kValueIcons.length],
               title: e.value.title,
               subtitle: e.value.description ?? '',
               color: _kValueColors[e.key % _kValueColors.length],
             )).toList()
-        : _staticCoreValues;
+        : <_CoreValue>[];
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -234,19 +195,20 @@ class AboutChurchScreen extends ConsumerWidget {
 
                   const SizedBox(height: AppSpacing.sp8),
 
-                  _SectionTitle(title: 'Our Story', isDark: isDark),
-                  const SizedBox(height: AppSpacing.sp4),
-                  ..._timelineItems.asMap().entries.map(
-                    (entry) => _TimelineItem(
-                      year: entry.value.year,
-                      title: entry.value.title,
-                      description: entry.value.description,
-                      isLast: entry.key == _timelineItems.length - 1,
-                      isDark: isDark,
+                  if (church != null && church.timeline.isNotEmpty) ...[
+                    _SectionTitle(title: 'Our Story', isDark: isDark),
+                    const SizedBox(height: AppSpacing.sp4),
+                    ...church.timeline.asMap().entries.map(
+                      (entry) => _TimelineItem(
+                        year: entry.value.year,
+                        title: entry.value.title,
+                        description: entry.value.description,
+                        isLast: entry.key == church.timeline.length - 1,
+                        isDark: isDark,
+                      ),
                     ),
-                  ),
-
-                  const SizedBox(height: AppSpacing.sp8),
+                    const SizedBox(height: AppSpacing.sp8),
+                  ],
 
                   _SectionTitle(title: 'By the Numbers', isDark: isDark),
                   const SizedBox(height: AppSpacing.sp4),
@@ -291,14 +253,6 @@ class _CoreValue {
   final String title;
   final String subtitle;
   final Color color;
-}
-
-class _TimelineData {
-  const _TimelineData({required this.year, required this.title, required this.description});
-
-  final String year;
-  final String title;
-  final String description;
 }
 
 // ── Widgets ─────────────────────────────────────────────────────────────────

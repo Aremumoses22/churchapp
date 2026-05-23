@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(redis-cli ping *)",
+      "Bash(find /opt/homebrew /usr/local -name \"psql\" 2>/dev/null | head -5; find /Applications -name \"psql\" 2>/dev/null | head -3)",
+      "Read(//opt/homebrew/**)",
+      "Read(//Applications/**)",
+      "Bash(/opt/homebrew/Cellar/postgresql@16/16.12/bin/psql postgresql://mbp@localhost:5432/churchapp -c \"SELECT version\\(\\);\")",
+      "Bash(/opt/homebrew/Cellar/postgresql@16/16.12/bin/psql postgresql://mbp@localhost:5432/churchapp -c \"\\\\dt\")",
+      "Bash(/opt/homebrew/Cellar/postgresql@16/16.12/bin/psql postgresql://mbp@localhost:5432/churchapp -c \"SELECT COUNT\\(*\\) FROM churches; SELECT COUNT\\(*\\) FROM bible_books; SELECT COUNT\\(*\\) FROM users; SELECT COUNT\\(*\\) FROM sermons;\")",
+      "Bash(/opt/homebrew/Cellar/postgresql@16/16.12/bin/psql postgresql://mbp@localhost:5432/churchapp -c ' *)",
+      "Bash(node --input-type=module)",
+      "Bash(curl -s http://localhost:8080/health)",
+      "Bash(curl -s http://localhost:8080/api/v1/church/about)",
+      "Bash(curl -s http://localhost:8080/api/v1/sermons)",
+      "Bash(curl -s http://localhost:8080/api/v1/bible/books)",
+      "Bash(curl -s -X POST http://localhost:8080/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@gracecommunity.app\",\"password\":\"Admin@123\"}')",
+      "Bash(dart analyze *)",
+      "Bash(sed -n '46,80p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/forum/create_post_screen.dart\")",
+      "Bash(sed -n '33,56p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/profile/edit_profile_screen.dart\")",
+      "Bash(sed -n '366,410p' \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features/bible/reading_plan_screen.dart\")",
+      "Bash(grep -rn \"static.*\\\\[.*\\\\]\\\\|hardcod\\\\|mock\\\\|fake\\\\|1243\\\\|999\\\\|888\\\\|777\\\\|\\\\bcount.*=.*[0-9]\\\\{2,\\\\}\\\\|viewers\\\\|watching\" \"/Users/mbp/Documents/Practice/Church App/churchapp/lib/features\" --include=\"*.dart\")"
+    ]
+  }
+}

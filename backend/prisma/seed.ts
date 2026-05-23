@@ -53,6 +53,13 @@ async function seed() {
           liveService: true,
           kidsCheckin: true,
         },
+        timeline: [
+          { year: '1998', title: 'The Beginning', description: 'Started as a small Bible study group of 12 people meeting in a living room.' },
+          { year: '2003', title: 'First Building', description: 'Moved into our first church building with 150 members.' },
+          { year: '2010', title: 'Community Expansion', description: 'Launched outreach programs and grew to over 800 members.' },
+          { year: '2018', title: 'Multi-Campus', description: 'Opened our second and third campuses to reach more communities.' },
+          { year: '2024', title: 'Digital Ministry', description: 'Launched online services and this app to connect with members worldwide.' },
+        ],
       },
     },
   });

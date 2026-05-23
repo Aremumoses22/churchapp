@@ -3,6 +3,7 @@ import type { AuthRequest } from '../../middleware/auth';
 import { communityService } from './community.service';
 import { ApiError } from '../../utils/apiError';
 import { ApiResponse } from '../../utils/apiResponse';
+import { resolveChurchId } from '../../utils/churchHelper';
 
 const param = (req: AuthRequest, name: string): string => req.params[name] as string;
 
@@ -11,8 +12,9 @@ const param = (req: AuthRequest, name: string): string => req.params[name] as st
 // ═══════════════════════════════════════════════════════
 export async function getAnnouncements(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await communityService.getAnnouncements(req.user.churchId, req.user.id, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await communityService.getAnnouncements(churchId, req.user!.id, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }
@@ -38,16 +40,18 @@ export async function markAnnouncementRead(req: AuthRequest, res: Response, next
 // ═══════════════════════════════════════════════════════
 export async function getTestimonies(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await communityService.getTestimonies(req.user.churchId, req.user.id, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await communityService.getTestimonies(churchId, req.user!.id, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }
 
 export async function submitTestimony(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await communityService.submitTestimony(req.user.id, req.user.churchId, req.body);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await communityService.submitTestimony(req.user!.id, churchId, req.body);
     ApiResponse.created(res, result, 'Testimony submitted for review');
   } catch (error) { next(error); }
 }
@@ -66,8 +70,9 @@ export async function reactToTestimony(req: AuthRequest, res: Response, next: Ne
 // ═══════════════════════════════════════════════════════
 export async function getDirectory(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await communityService.getDirectory(req.user.churchId, req.query as any);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await communityService.getDirectory(churchId, req.query as any);
     ApiResponse.paginated(res, result.data, result.meta);
   } catch (error) { next(error); }
 }
@@ -77,8 +82,9 @@ export async function getDirectory(req: AuthRequest, res: Response, next: NextFu
 // ═══════════════════════════════════════════════════════
 export async function generateInviteLink(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    if (!req.user?.churchId) throw ApiError.badRequest('No church associated');
-    const result = await communityService.generateInviteLink(req.user.id, req.user.churchId);
+    const churchId = await resolveChurchId(req);
+    if (!churchId) throw ApiError.badRequest('No church associated');
+    const result = await communityService.generateInviteLink(req.user!.id, churchId);
     ApiResponse.created(res, result, 'Invite link generated');
   } catch (error) { next(error); }
 }

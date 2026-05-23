@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/forum.dart';
 import '../../core/providers/forum_providers.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -42,26 +43,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
   bool _agreedGuidelines = false;
   bool _isSubmitting = false;
 
-  // ── Categories ────────────────────────────────────────────────────────
-  static const _categories = <_CatOption>[
-    _CatOption('Prayer Requests', Icons.volunteer_activism_outlined,
-        Color(0xFFEF4444)),
-    _CatOption(
-        'Bible Study', Icons.menu_book_outlined, Color(0xFF3B82F6)),
-    _CatOption(
-        'Testimonies', Icons.auto_awesome_outlined, Color(0xFFF59E0B)),
-    _CatOption('General Discussion', Icons.chat_bubble_outline_rounded,
-        Color(0xFF6366F1)),
-    _CatOption(
-        'Youth & Young Adults', Icons.groups_outlined, Color(0xFF8B5CF6)),
-    _CatOption(
-        'Events & Activities', Icons.event_outlined, Color(0xFF059669)),
-    _CatOption('Volunteering', Icons.handshake_outlined,
-        Color(0xFFEC4899)),
-    _CatOption('Questions & Answers', Icons.help_outline_rounded,
-        Color(0xFF0EA5E9)),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -88,18 +69,8 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     if (!_canSubmit) return;
     setState(() => _isSubmitting = true);
 
-    final apiCategories = ref.read(forumCategoriesProvider).value ?? [];
-    final selectedName = _selectedCategory?.toLowerCase() ?? '';
-    var categoryId = _selectedCategory ?? '';
-    for (final c in apiCategories) {
-      if (c.label.toLowerCase() == selectedName) {
-        categoryId = c.id;
-        break;
-      }
-    }
-
-    final res = await ref.read(apiForumRepositoryProvider).createThread(
-      categoryId: categoryId,
+    final res = await ref.read(forumRepositoryProvider).createThread(
+      categoryId: _selectedCategory ?? '',
       title: _titleCtrl.text.trim(),
       content: _bodyCtrl.text.trim(),
     );
@@ -125,7 +96,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
     }
   }
 
-  void _showCategoryPicker() {
+  void _showCategoryPicker(List<ForumCategory> categories) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet<String>(
@@ -146,7 +117,6 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Handle
               Center(
                 child: Container(
                   width: 36,
@@ -170,89 +140,83 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                 ),
               ),
               const SizedBox(height: AppSpacing.sp3),
-
-              ..._categories.map((cat) {
-                final selected = _selectedCategory == cat.label;
-                return AppTapAnimation(
-                  onTap: () => Navigator.of(ctx).pop(cat.label),
-                  child: Container(
-                    margin:
-                        const EdgeInsets.only(bottom: AppSpacing.sp2),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: AppSpacing.sp3,
-                        vertical: AppSpacing.sp3),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? cat.color.withValues(alpha: 0.12)
-                          : (isDark
-                              ? Colors.white.withValues(alpha: 0.04)
-                              : const Color(0xFFF8FAFC)),
-                      borderRadius: AppRadius.borderRadiusMd,
-                      border: selected
-                          ? Border.all(
-                              color:
-                                  cat.color.withValues(alpha: 0.4))
-                          : null,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color:
-                                cat.color.withValues(alpha: 0.12),
-                            borderRadius: AppRadius.borderRadiusMd,
+              if (categories.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: AppSpacing.sp4),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else
+                ...categories.map((cat) {
+                  final selected = _selectedCategory == cat.id;
+                  return AppTapAnimation(
+                    onTap: () => Navigator.of(ctx).pop(cat.id),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: AppSpacing.sp2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.sp3, vertical: AppSpacing.sp3),
+                      decoration: BoxDecoration(
+                        color: selected
+                            ? cat.color.withValues(alpha: 0.12)
+                            : (isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : const Color(0xFFF8FAFC)),
+                        borderRadius: AppRadius.borderRadiusMd,
+                        border: selected
+                            ? Border.all(color: cat.color.withValues(alpha: 0.4))
+                            : null,
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: cat.color.withValues(alpha: 0.12),
+                              borderRadius: AppRadius.borderRadiusMd,
+                            ),
+                            child: Icon(cat.icon, color: cat.color, size: 18),
                           ),
-                          child: Icon(cat.icon,
-                              color: cat.color, size: 18),
-                        ),
-                        const SizedBox(width: AppSpacing.sp3),
-                        Expanded(
-                          child: Text(
-                            cat.label,
-                            style:
-                                AppTextStyles.labelMedium.copyWith(
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimary,
-                              fontWeight: selected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                          const SizedBox(width: AppSpacing.sp3),
+                          Expanded(
+                            child: Text(
+                              cat.label,
+                              style: AppTextStyles.labelMedium.copyWith(
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimary,
+                                fontWeight: selected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
                             ),
                           ),
-                        ),
-                        if (selected)
-                          Icon(Icons.check_circle_rounded,
-                              color: cat.color, size: 20),
-                      ],
+                          if (selected)
+                            Icon(Icons.check_circle_rounded,
+                                color: cat.color, size: 20),
+                        ],
+                      ),
                     ),
-                  ),
-                );
-              }),
+                  );
+                }),
             ],
           ),
         );
       },
     ).then((value) {
-      if (value != null) {
-        setState(() => _selectedCategory = value);
-      }
+      if (value != null) setState(() => _selectedCategory = value);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    // Derive category color for display
-    Color? catColor;
-    for (final c in _categories) {
-      if (c.label == _selectedCategory) {
-        catColor = c.color;
-        break;
-      }
-    }
+    final categories = ref.watch(forumCategoriesProvider).maybeWhen(
+          data: (cats) => cats,
+          orElse: () => <ForumCategory>[],
+        );
+    final selectedCat = _selectedCategory == null
+        ? null
+        : categories.where((c) => c.id == _selectedCategory).firstOrNull;
 
     return Scaffold(
       appBar: AppFilledAppBar(
@@ -278,7 +242,7 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
             children: [
               // ── Category picker ──────────────────────────────────────
               AppTapAnimation(
-                onTap: _showCategoryPicker,
+                onTap: () => _showCategoryPicker(categories),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sp3, vertical: AppSpacing.sp3),
@@ -295,20 +259,17 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                   ),
                   child: Row(
                     children: [
-                      if (catColor != null) ...[
+                      if (selectedCat != null) ...[
                         Container(
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
-                            color: catColor.withValues(alpha: 0.12),
+                            color: selectedCat.color.withValues(alpha: 0.12),
                             borderRadius: AppRadius.borderRadiusSm,
                           ),
                           child: Icon(
-                            _categories
-                                .firstWhere(
-                                    (c) => c.label == _selectedCategory)
-                                .icon,
-                            color: catColor,
+                            selectedCat.icon,
+                            color: selectedCat.color,
                             size: 15,
                           ),
                         ),
@@ -316,16 +277,16 @@ class _CreatePostScreenState extends ConsumerState<CreatePostScreen> {
                       ],
                       Expanded(
                         child: Text(
-                          _selectedCategory ?? 'Select a category',
+                          selectedCat?.label ?? 'Select a category',
                           style: AppTextStyles.bodyMedium.copyWith(
-                            color: _selectedCategory != null
+                            color: selectedCat != null
                                 ? (isDark
                                     ? AppColors.textPrimaryDark
                                     : AppColors.textPrimary)
                                 : (isDark
                                     ? AppColors.textSecondaryDark
                                     : AppColors.textDisabled),
-                            fontWeight: _selectedCategory != null
+                            fontWeight: selectedCat != null
                                 ? FontWeight.w500
                                 : FontWeight.w400,
                           ),
@@ -577,13 +538,3 @@ class _FormatBtn extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// CATEGORY DATA MODEL
-// ═══════════════════════════════════════════════════════════════════════════════
-
-class _CatOption {
-  const _CatOption(this.label, this.icon, this.color);
-  final String label;
-  final IconData icon;
-  final Color color;
-}

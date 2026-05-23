@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../core/navigation/app_routes.dart';
 import '../../core/providers/providers.dart';
 import '../../core/theme/theme.dart';
 import '../../shared/widgets/widgets.dart';
@@ -8,101 +10,30 @@ import '../../shared/widgets/widgets.dart';
 // ──────────────────────────────────────────────────────────────────────────────
 // CHURCH DIRECTORY SCREEN
 //
-// Searchable member list (opt-in), alphabetical index, avatar + name +
-// department, tap to view profile card (bottom sheet).
+// Searchable member list from backend API, alphabetical index,
+// avatar + name + department, tap to view profile card (bottom sheet).
 // ──────────────────────────────────────────────────────────────────────────────
 
 class ChurchDirectoryScreen extends ConsumerStatefulWidget {
   const ChurchDirectoryScreen({super.key});
 
   @override
-  ConsumerState<ChurchDirectoryScreen> createState() => _ChurchDirectoryScreenState();
+  ConsumerState<ChurchDirectoryScreen> createState() =>
+      _ChurchDirectoryScreenState();
 }
 
-class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
+class _ChurchDirectoryScreenState
+    extends ConsumerState<ChurchDirectoryScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  List<_MemberData>? _apiMembers;
 
-  static const _members = [
-    _MemberData(
-      name: 'Aaron Mitchell',
-      department: 'Music Ministry',
-      role: 'Worship Leader',
-      joinedYear: '2019',
-    ),
-    _MemberData(
-      name: 'Angela Roberts',
-      department: 'Children Ministry',
-      role: 'Volunteer',
-      joinedYear: '2021',
-    ),
-    _MemberData(
-      name: 'Benjamin Cole',
-      department: 'Ushering',
-      role: 'Head Usher',
-      joinedYear: '2018',
-    ),
-    _MemberData(
-      name: 'Caleb Johnson',
-      department: 'Media',
-      role: 'Sound Engineer',
-      joinedYear: '2020',
-    ),
-    _MemberData(
-      name: 'Daniel Okafor',
-      department: 'Outreach',
-      role: 'Team Lead',
-      joinedYear: '2017',
-    ),
-    _MemberData(
-      name: 'Elizabeth Grant',
-      department: 'Music Ministry',
-      role: 'Choir Member',
-      joinedYear: '2022',
-    ),
-    _MemberData(
-      name: 'Grace Williams',
-      department: 'Prayer Team',
-      role: 'Intercessor',
-      joinedYear: '2016',
-    ),
-    _MemberData(
-      name: 'James Patterson',
-      department: 'Hospitality',
-      role: 'Welcome Team',
-      joinedYear: '2023',
-    ),
-    _MemberData(
-      name: 'Marcus Johnson',
-      department: "Men's Ministry",
-      role: 'Group Leader',
-      joinedYear: '2015',
-    ),
-    _MemberData(
-      name: 'Rachel Adams',
-      department: "Women's Ministry",
-      role: 'Group Leader',
-      joinedYear: '2018',
-    ),
-    _MemberData(
-      name: 'Samuel Torres',
-      department: 'Youth Ministry',
-      role: 'Youth Pastor',
-      joinedYear: '2019',
-    ),
-    _MemberData(
-      name: 'Victoria Lee',
-      department: 'Administration',
-      role: 'Church Secretary',
-      joinedYear: '2017',
-    ),
-  ];
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
-  List<_MemberData> get _source => _apiMembers ?? _members;
-
-  List<_MemberData> get _filteredMembers {
-    final src = _source;
+  List<_MemberData> _filter(List<_MemberData> src) {
     if (_searchQuery.isEmpty) return src;
     final q = _searchQuery.toLowerCase();
     return src
@@ -115,10 +46,11 @@ class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
         .toList();
   }
 
-  Map<String, List<_MemberData>> get _groupedMembers {
+  Map<String, List<_MemberData>> _group(List<_MemberData> members) {
     final map = <String, List<_MemberData>>{};
-    for (final m in _filteredMembers) {
-      final letter = m.name[0].toUpperCase();
+    for (final m in members) {
+      final letter =
+          m.name.trim().isNotEmpty ? m.name.trim()[0].toUpperCase() : '#';
       map.putIfAbsent(letter, () => []).add(m);
     }
     return Map.fromEntries(
@@ -127,31 +59,9 @@ class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
   }
 
   @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    ref.listen(directoryProvider, (_, next) {
-      next.whenData((members) {
-        if (members.isNotEmpty) {
-          setState(() {
-            _apiMembers = members
-                .map((m) => _MemberData(
-                      name: m.name,
-                      department: m.department ?? '',
-                      role: '',
-                      joinedYear: m.joinedDate ?? '',
-                    ))
-                .toList();
-          });
-        }
-      });
-    });
+    final asyncDir = ref.watch(directoryProvider);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
@@ -159,102 +69,132 @@ class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
         title: 'Church Directory',
         showBack: true,
       ),
-      body: Column(
-        children: [
-          // ── Search bar ─────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(
-              AppSpacing.screenHorizontalPadding,
-            ),
-            child: AppSearchBar(
-              controller: _searchController,
-              hint: 'Search members...',
-              onChanged: (val) => setState(() => _searchQuery = val),
-              onClear: () {
-                _searchController.clear();
-                setState(() => _searchQuery = '');
-              },
-            ),
+      body: asyncDir.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(
+          child: AppEmptyState(
+            icon: Icons.error_outline,
+            title: 'Failed to load directory',
+            subtitle: 'Pull down to retry',
           ),
-
-          // ── Member count ───────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.screenHorizontalPadding,
-            ),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredMembers.length} members',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textDisabled,
-                  ),
+        ),
+        data: (apiMembers) {
+          final members = apiMembers
+              .map(
+                (m) => _MemberData(
+                  id: m.id,
+                  name: m.name,
+                  department: m.department ?? '',
+                  role: '',
+                  joinedYear: m.joinedDate ?? '',
                 ),
-                const Spacer(),
-                Icon(
-                  Icons.people_outline,
-                  size: 16,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textDisabled,
+              )
+              .toList();
+          final filtered = _filter(members);
+          final grouped = _group(filtered);
+
+          return Column(
+            children: [
+              // ── Search bar ──────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.all(
+                  AppSpacing.screenHorizontalPadding,
                 ),
-              ],
-            ),
-          ),
+                child: AppSearchBar(
+                  controller: _searchController,
+                  hint: 'Search members...',
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  onClear: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+              ),
 
-          const SizedBox(height: AppSpacing.sp2),
+              // ── Member count ─────────────────────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.screenHorizontalPadding,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      '${filtered.length} members',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textDisabled,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.people_outline,
+                      size: 16,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textDisabled,
+                    ),
+                  ],
+                ),
+              ),
 
-          // ── List ───────────────────────────────────────────────────────
-          Expanded(
-            child: _filteredMembers.isEmpty
-                ? Center(
-                    child: AppEmptyState(
-                      icon: Icons.search_off,
-                      title: 'No Members Found',
-                      subtitle: 'Try a different search term',
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.screenHorizontalPadding,
-                    ),
-                    itemCount: _groupedMembers.length,
-                    itemBuilder: (context, sectionIndex) {
-                      final entry =
-                          _groupedMembers.entries.elementAt(sectionIndex);
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Section header
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: AppSpacing.sp3,
-                              bottom: AppSpacing.sp2,
-                            ),
-                            child: Text(
-                              entry.key,
-                              style: AppTextStyles.labelMedium.copyWith(
-                                color: isDark
-                                    ? AppColors.primaryLight
-                                    : AppColors.primary,
+              const SizedBox(height: AppSpacing.sp2),
+
+              // ── List ──────────────────────────────────────────────────
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: AppEmptyState(
+                          icon: _searchQuery.isNotEmpty
+                              ? Icons.search_off
+                              : Icons.people_outline,
+                          title: _searchQuery.isNotEmpty
+                              ? 'No Members Found'
+                              : 'Directory is Empty',
+                          subtitle: _searchQuery.isNotEmpty
+                              ? 'Try a different search term'
+                              : 'No members have opted in yet',
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.screenHorizontalPadding,
+                        ),
+                        itemCount: grouped.length,
+                        itemBuilder: (context, sectionIndex) {
+                          final entry =
+                              grouped.entries.elementAt(sectionIndex);
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AppSpacing.sp3,
+                                  bottom: AppSpacing.sp2,
+                                ),
+                                child: Text(
+                                  entry.key,
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    color: isDark
+                                        ? AppColors.primaryLight
+                                        : AppColors.primary,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                          // Members in section
-                          ...entry.value.map((m) => _MemberTile(
-                                member: m,
-                                isDark: isDark,
-                                onTap: () =>
-                                    _showMemberProfile(context, m, isDark),
-                              )),
-                        ],
-                      );
-                    },
-                  ),
-          ),
-        ],
+                              ...entry.value.map((m) => _MemberTile(
+                                    member: m,
+                                    isDark: isDark,
+                                    onTap: () => _showMemberProfile(
+                                        context, m, isDark),
+                                  )),
+                            ],
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -269,6 +209,7 @@ class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => MemberProfileCard(
+        id: member.id,
         name: member.name,
         department: member.department,
         role: member.role,
@@ -283,12 +224,14 @@ class _ChurchDirectoryScreenState extends ConsumerState<ChurchDirectoryScreen> {
 
 class _MemberData {
   const _MemberData({
+    required this.id,
     required this.name,
     required this.department,
     required this.role,
     required this.joinedYear,
   });
 
+  final String id;
   final String name;
   final String department;
   final String role;
@@ -329,6 +272,13 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final initials = member.name
+        .trim()
+        .split(' ')
+        .where((n) => n.isNotEmpty)
+        .map((n) => n[0])
+        .join();
+
     return AppTapAnimation(
       onTap: onTap,
       child: Padding(
@@ -344,10 +294,9 @@ class _MemberTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 22,
-                backgroundColor:
-                    _departmentColor.withValues(alpha: 0.12),
+                backgroundColor: _departmentColor.withValues(alpha: 0.12),
                 child: Text(
-                  member.name.trim().split(' ').where((n) => n.isNotEmpty).map((n) => n[0]).join(),
+                  initials.isNotEmpty ? initials : '?',
                   style: AppTextStyles.labelSmall.copyWith(
                     color: _departmentColor,
                   ),
@@ -368,7 +317,9 @@ class _MemberTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${member.department}  •  ${member.role}',
+                      member.role.isNotEmpty
+                          ? '${member.department}  •  ${member.role}'
+                          : member.department,
                       style: AppTextStyles.bodySmall.copyWith(
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -382,9 +333,8 @@ class _MemberTile extends StatelessWidget {
               Icon(
                 Icons.chevron_right,
                 size: 20,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.inactive,
+                color:
+                    isDark ? AppColors.textSecondaryDark : AppColors.inactive,
               ),
             ],
           ),
@@ -396,14 +346,12 @@ class _MemberTile extends StatelessWidget {
 
 // ──────────────────────────────────────────────────────────────────────────────
 // MEMBER PROFILE CARD (Bottom Sheet)
-//
-// Shows someone's public profile: avatar, name, department,
-// "Pray for them" button, joined date.
 // ──────────────────────────────────────────────────────────────────────────────
 
-class MemberProfileCard extends StatelessWidget {
+class MemberProfileCard extends ConsumerStatefulWidget {
   const MemberProfileCard({
     super.key,
+    required this.id,
     required this.name,
     required this.department,
     required this.role,
@@ -411,6 +359,7 @@ class MemberProfileCard extends StatelessWidget {
     required this.isDark,
   });
 
+  final String id;
   final String name;
   final String department;
   final String role;
@@ -418,156 +367,251 @@ class MemberProfileCard extends StatelessWidget {
   final bool isDark;
 
   @override
+  ConsumerState<MemberProfileCard> createState() => _MemberProfileCardState();
+}
+
+class _MemberProfileCardState extends ConsumerState<MemberProfileCard> {
+  bool _isCreatingChat = false;
+
+  Future<void> _sendMessage() async {
+    if (_isCreatingChat || widget.id.isEmpty) return;
+    setState(() => _isCreatingChat = true);
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      final convoId = await repo.createConversation(
+        type: 'DIRECT',
+        memberIds: [widget.id],
+      );
+      if (!mounted) return;
+      final router = GoRouter.of(context);
+      Navigator.of(context).pop();
+      router.push(
+        '${AppRoutes.chatConversation.replaceAll(':id', convoId)}'
+        '?name=${Uri.encodeComponent(widget.name)}',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isCreatingChat = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to start conversation. Try again.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _prayForThem() async {
+    final contentCtrl = TextEditingController();
+    bool isSubmitting = false;
+    String? errorText;
+
+    final sent = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Pray for ${widget.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Write a prayer for ${widget.name} and it will be sent.',
+                style: AppTextStyles.bodySmall.copyWith(
+                  color: widget.isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: contentCtrl,
+                maxLines: 4,
+                autofocus: true,
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: 'Lord, I pray for...',
+                  errorText: errorText,
+                  border: const OutlineInputBorder(),
+                  focusedBorder: const OutlineInputBorder(
+                    borderSide: BorderSide(color: AppColors.primary, width: 2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      final content = contentCtrl.text.trim();
+                      if (content.length < 10) {
+                        setDialogState(
+                          () => errorText = 'Please write at least 10 characters',
+                        );
+                        return;
+                      }
+                      setDialogState(() => isSubmitting = true);
+                      final repo = ref.read(prayerRepositoryProvider);
+                      final res = await repo.submitRequest(
+                        title: 'Prayer for ${widget.name}',
+                        content: content,
+                        isAnonymous: false,
+                        isUrgent: false,
+                      );
+                      if (ctx.mounted) Navigator.pop(ctx, res.success);
+                    },
+              child: isSubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Send Prayer'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    contentCtrl.dispose();
+
+    if (sent == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Prayer sent for ${widget.name}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final initials = widget.name
+        .trim()
+        .split(' ')
+        .where((n) => n.isNotEmpty)
+        .map((n) => n[0])
+        .join();
+
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? AppColors.cardDark : AppColors.surface,
+        color: widget.isDark ? AppColors.cardDark : AppColors.surface,
         borderRadius: AppRadius.borderRadiusXlTop,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           const SizedBox(height: AppSpacing.sp3),
           Container(
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: isDark ? AppColors.borderDark : AppColors.inactive,
+              color: widget.isDark ? AppColors.borderDark : AppColors.inactive,
               borderRadius: AppRadius.borderRadiusFull,
             ),
           ),
-
           Padding(
             padding: const EdgeInsets.all(AppSpacing.sp6),
             child: Column(
               children: [
-                // Avatar
                 CircleAvatar(
                   radius: 44,
-                  backgroundColor: isDark
+                  backgroundColor: widget.isDark
                       ? AppColors.primaryLight
                       : AppColors.skyLight,
                   child: Text(
-                    name.trim().split(' ').where((n) => n.isNotEmpty).map((n) => n[0]).join(),
+                    initials.isNotEmpty ? initials : '?',
                     style: AppTextStyles.headingLarge.copyWith(
                       color: AppColors.primary,
                     ),
                   ),
                 ),
-
                 const SizedBox(height: AppSpacing.sp4),
-
-                // Name
                 Text(
-                  name,
+                  widget.name,
                   style: AppTextStyles.headingMedium.copyWith(
-                    color: isDark
+                    color: widget.isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimary,
                   ),
                 ),
-
                 const SizedBox(height: AppSpacing.sp1),
-
-                // Role & department
                 Text(
-                  '$role  •  $department',
+                  widget.role.isNotEmpty
+                      ? '${widget.role}  •  ${widget.department}'
+                      : widget.department,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    color: isDark
+                    color: widget.isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondary,
                   ),
                 ),
-
-                const SizedBox(height: AppSpacing.sp2),
-
-                // Joined
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.sp3,
-                    vertical: AppSpacing.sp1,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.skyDark
-                        : AppColors.skyLight,
-                    borderRadius: AppRadius.borderRadiusFull,
-                  ),
-                  child: Text(
-                    'Member since $joinedYear',
-                    style: AppTextStyles.bodySmall.copyWith(
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.primary,
-                      fontSize: 11,
+                if (widget.joinedYear.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.sp2),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.sp3,
+                      vertical: AppSpacing.sp1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: widget.isDark
+                          ? AppColors.skyDark
+                          : AppColors.skyLight,
+                      borderRadius: AppRadius.borderRadiusFull,
+                    ),
+                    child: Text(
+                      'Member since ${widget.joinedYear}',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: widget.isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.primary,
+                        fontSize: 11,
+                      ),
                     ),
                   ),
-                ),
-
+                ],
                 const SizedBox(height: AppSpacing.sp6),
-
-                // Action buttons
                 Row(
                   children: [
                     Expanded(
                       child: AppPrimaryButton(
                         label: 'Pray for Them',
-                        onPressed: () {},
-                        icon: const Icon(Icons.volunteer_activism_outlined, color: Colors.white, size: 18),
+                        onPressed: _prayForThem,
+                        icon: const Icon(
+                          Icons.volunteer_activism_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sp3),
                     Expanded(
-                      child: AppSecondaryButton(
-                        label: 'Send Message',
-                        onPressed: () {},
-                      ),
+                      child: _isCreatingChat
+                          ? const Center(
+                              child: SizedBox(
+                                height: 24,
+                                width: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            )
+                          : AppSecondaryButton(
+                              label: 'Send Message',
+                              onPressed: _sendMessage,
+                            ),
                     ),
                   ],
                 ),
-
-                const SizedBox(height: AppSpacing.sp4),
-
-                // Info tiles
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.sp4),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppColors.bgDark
-                        : AppColors.warmWhite,
-                    borderRadius: AppRadius.borderRadiusMd,
-                  ),
-                  child: Column(
-                    children: [
-                      _ProfileInfoRow(
-                        icon: Icons.groups_outlined,
-                        label: 'Connect Group',
-                        value: "Men's Fellowship",
-                        isDark: isDark,
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          vertical: AppSpacing.sp2,
-                        ),
-                        child: Container(
-                          height: 0.5,
-                          color: isDark
-                              ? AppColors.borderDark
-                              : AppColors.divider,
-                        ),
-                      ),
-                      _ProfileInfoRow(
-                        icon: Icons.church_outlined,
-                        label: 'Campus',
-                        value: 'Main Campus',
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Safety spacer
                 SizedBox(
                   height: MediaQuery.of(context).padding.bottom +
                       AppSpacing.sp4,
@@ -581,48 +625,3 @@ class MemberProfileCard extends StatelessWidget {
   }
 }
 
-class _ProfileInfoRow extends StatelessWidget {
-  const _ProfileInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.isDark,
-  });
-
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color:
-              isDark ? AppColors.textSecondaryDark : AppColors.textDisabled,
-        ),
-        const SizedBox(width: AppSpacing.sp3),
-        Text(
-          label,
-          style: AppTextStyles.bodySmall.copyWith(
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textDisabled,
-          ),
-        ),
-        const Spacer(),
-        Text(
-          value,
-          style: AppTextStyles.labelSmall.copyWith(
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
