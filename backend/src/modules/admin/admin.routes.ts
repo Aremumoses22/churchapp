@@ -1,24 +1,32 @@
 import { Router } from 'express';
 import adminAuthRoutes from './auth/admin-auth.routes';
+import analyticsRoutes from './analytics/analytics.routes';
+import membersRoutes from './members/members.routes';
+import churchRoutes from './church/church.routes';
+import sermonsRoutes from './sermons/sermons.routes';
+import mediaRoutes from './media/media.routes';
+import eventsRoutes from './events/events.routes';
+import givingRoutes from './giving/giving.routes';
+import groupsRoutes from './groups/groups.routes';
+import prayerRoutes from './prayer/prayer.routes';
+import liveRoutes from './live/live.routes';
+import forumRoutes from './forum/forum.routes';
+import notificationsRoutes from './notifications/notifications.routes';
 
 const router = Router();
 
 router.use('/auth', adminAuthRoutes);
-
-// Phase 1+ sub-routers will be mounted here:
-// router.use('/overview', adminOverviewRoutes);
-// router.use('/members', adminMembersRoutes);
-// router.use('/sermons', adminSermonsRoutes);
-// router.use('/events', adminEventsRoutes);
-// router.use('/giving', adminGivingRoutes);
-// router.use('/groups', adminGroupsRoutes);
-// router.use('/prayer', adminPrayerRoutes);
-// router.use('/forum', adminForumRoutes);
-// router.use('/media', adminMediaRoutes);
-// router.use('/live', adminLiveRoutes);
-// router.use('/notifications', adminNotificationsRoutes);
-// router.use('/volunteer', adminVolunteerRoutes);
-// router.use('/kids', adminKidsRoutes);
-// router.use('/church', adminChurchRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/members', membersRoutes);
+router.use('/church', churchRoutes);
+router.use('/sermons', sermonsRoutes);
+router.use('/media', mediaRoutes);
+router.use('/events', eventsRoutes);
+router.use('/giving', givingRoutes);
+router.use('/groups', groupsRoutes);
+router.use('/prayer', prayerRoutes);
+router.use('/live', liveRoutes);
+router.use('/forum', forumRoutes);
+router.use('/notifications', notificationsRoutes);
 
 export default router;

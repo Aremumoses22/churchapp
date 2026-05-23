@@ -24,10 +24,29 @@
       "Bash(npx shadcn@latest init --defaults)",
       "Bash(npx shadcn@latest add input label card badge avatar dropdown-menu separator tooltip sheet)",
       "Bash(npx tsc *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(sed -n '363,430p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '934,985p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '1177,1220p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '1761,1800p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '278,345p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '1091,1145p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(npm list *)",
+      "Bash(npx shadcn@latest add dialog select textarea switch tabs table)",
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/members/[id]\")",
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/members/[id]/edit\")",
+      "Bash(sed -n '596,690p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '647,690p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '631,650p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(sed -n '666,712p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/create\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/series\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/[id]/edit\")",
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/create\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/[id]/edit\")",
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/[id]/registrations\")"
     ],
     "additionalDirectories": [
-      "/Users/mbp/Documents/Practice/Church App"
+      "/Users/mbp/Documents/Practice/Church App",
+      "/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/(dashboard)/sermons/[id]",
+      "/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/(dashboard)/events/[id]"
     ]
   }
 }
