@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { adminLiveService } from './live.service';
 import { ApiResponse } from '../../../utils/apiResponse';
 import { AuthRequest } from '../../../middleware/auth';
+import { notifyLiveServiceStarted } from '../../../services/notification.triggers';
 
 function cid(req: AuthRequest): string | null | undefined {
   if (req.user?.role === 'SUPER_ADMIN') {
@@ -35,7 +36,13 @@ export const liveController = {
   },
 
   async goLive(req: AuthRequest, res: Response, next: NextFunction) {
-    try { ApiResponse.success(res, await adminLiveService.goLive(cid(req), pid(req)), 'Service is now LIVE'); } catch (e) { next(e); }
+    try {
+      const churchId = cid(req);
+      const service = await adminLiveService.goLive(churchId, pid(req));
+      ApiResponse.success(res, service, 'Service is now LIVE');
+      // Push "We're Live!" to all church members
+      if (churchId) notifyLiveServiceStarted(churchId, service.id, service.title).catch(() => {});
+    } catch (e) { next(e); }
   },
 
   async endService(req: AuthRequest, res: Response, next: NextFunction) {

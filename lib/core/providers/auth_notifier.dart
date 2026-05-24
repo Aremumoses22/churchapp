@@ -14,6 +14,7 @@ import '../models/auth.dart';
 import '../models/user.dart';
 import '../repositories/auth_repository.dart';
 import '../services/auth_service.dart';
+import '../services/push_notification_service.dart';
 import 'auth_providers.dart';
 
 /// Auth state exposed to the UI.
@@ -99,6 +100,9 @@ class AuthNotifier extends Notifier<AuthNotifierState> {
         churchId: user.churchId,
         hasCompletedSetup: user.hasCompletedSetup,
       );
+
+      // Register FCM token now that we have a valid session.
+      PushNotificationService.instance.onLoggedIn().ignore();
 
       state = state.copyWith(isLoading: false, user: user);
       return true;

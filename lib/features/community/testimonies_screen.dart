@@ -27,12 +27,15 @@ class TestimoniesScreen extends ConsumerWidget {
         prayers: t.prayCount,
         comments: 0,
         isLiked: t.hasLiked,
+        isPrayed: t.hasPrayed,
       );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    // Use FutureProvider for load/error state, NotifierProvider for live mutations
     final testimoniesAsync = ref.watch(testimoniesFutureProvider);
+    final liveTestimonies = ref.watch(testimoniesProvider);
 
     final appBar = AppFilledAppBar(
       title: 'Testimonies',
@@ -74,8 +77,9 @@ class TestimoniesScreen extends ConsumerWidget {
           ),
         ),
       ),
-      data: (apiData) {
-        final testimonies = apiData.map(_fromApi).toList();
+      data: (_) {
+        // Use the live NotifierProvider so mutations (react) are reflected instantly
+        final testimonies = liveTestimonies.map(_fromApi).toList();
         return Scaffold(
           backgroundColor: isDark ? AppColors.bgDark : AppColors.warmWhite,
           appBar: appBar,
@@ -95,7 +99,16 @@ class TestimoniesScreen extends ConsumerWidget {
                     final t = testimonies[index];
                     return Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.cardGap),
-                      child: _TestimonyCard(testimony: t, isDark: isDark),
+                      child: _TestimonyCard(
+                        testimony: t,
+                        isDark: isDark,
+                        onLike: () => ref
+                            .read(testimoniesProvider.notifier)
+                            .react(t.id, 'LIKE'),
+                        onPray: () => ref
+                            .read(testimoniesProvider.notifier)
+                            .react(t.id, 'PRAYER'),
+                      ),
                     );
                   },
                 ),
@@ -119,6 +132,7 @@ class _TestimonyData {
     required this.prayers,
     required this.comments,
     required this.isLiked,
+    required this.isPrayed,
   });
 
   final String id;
@@ -131,6 +145,7 @@ class _TestimonyData {
   final int prayers;
   final int comments;
   final bool isLiked;
+  final bool isPrayed;
 }
 
 // ── Widgets ─────────────────────────────────────────────────────────────────
@@ -139,10 +154,14 @@ class _TestimonyCard extends StatelessWidget {
   const _TestimonyCard({
     required this.testimony,
     required this.isDark,
+    required this.onLike,
+    required this.onPray,
   });
 
   final _TestimonyData testimony;
   final bool isDark;
+  final VoidCallback onLike;
+  final VoidCallback onPray;
 
   Color get _categoryColor {
     switch (testimony.category) {
@@ -316,17 +335,21 @@ class _TestimonyCard extends StatelessWidget {
                           ? AppColors.textSecondaryDark
                           : AppColors.textDisabled),
                   isDark: isDark,
-                  onTap: () {},
+                  onTap: onLike,
                 ),
                 const SizedBox(width: AppSpacing.sp5),
                 _ReactionButton(
-                  icon: Icons.volunteer_activism_outlined,
+                  icon: testimony.isPrayed
+                      ? Icons.volunteer_activism
+                      : Icons.volunteer_activism_outlined,
                   label: '${testimony.prayers} praying',
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textDisabled,
+                  color: testimony.isPrayed
+                      ? AppColors.primary
+                      : (isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textDisabled),
                   isDark: isDark,
-                  onTap: () {},
+                  onTap: onPray,
                 ),
                 const SizedBox(width: AppSpacing.sp5),
                 _ReactionButton(

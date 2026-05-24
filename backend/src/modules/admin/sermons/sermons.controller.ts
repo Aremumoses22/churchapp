@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { adminSermonsService } from './sermons.service';
 import { ApiResponse } from '../../../utils/apiResponse';
 import { AuthRequest } from '../../../middleware/auth';
+import { notifyNewSermon } from '../../../services/notification.triggers';
 
 function cid(req: AuthRequest) {
   if (req.user?.role === 'SUPER_ADMIN') {
@@ -40,7 +41,13 @@ export const sermonsController = {
     try { ApiResponse.success(res, await adminSermonsService.getById(cid(req), pid(req))); } catch (e) { next(e); }
   },
   async create(req: AuthRequest, res: Response, next: NextFunction) {
-    try { ApiResponse.created(res, await adminSermonsService.create(cid(req), req.body)); } catch (e) { next(e); }
+    try {
+      const churchId = cid(req);
+      const sermon = await adminSermonsService.create(churchId, req.body);
+      ApiResponse.created(res, sermon);
+      // Fire-and-forget push notification to all church members
+      if (churchId) notifyNewSermon(churchId, sermon.id, sermon.title).catch(() => {});
+    } catch (e) { next(e); }
   },
   async update(req: AuthRequest, res: Response, next: NextFunction) {
     try { ApiResponse.success(res, await adminSermonsService.update(cid(req), pid(req), req.body), 'Sermon updated'); } catch (e) { next(e); }

@@ -206,17 +206,11 @@ class EventNotifier extends Notifier<EventState> {
     try {
       final res = await _repo.registerForEvent(eventId);
       if (res.success) {
-        // Update local state
-        final updated = state.events.map((e) {
-          if (e.id == eventId) {
-            return e.copyWith(
-              isRegistered: true,
-              registeredCount: e.registeredCount + 1,
-            );
-          }
-          return e;
-        }).toList();
-        state = state.copyWith(events: updated);
+        state = state.copyWith(
+          events: _applyRegistration(state.events, eventId, true),
+          featuredEvents: _applyRegistration(state.featuredEvents, eventId, true),
+        );
+        loadMyEvents();
         return true;
       }
       return false;
@@ -229,22 +223,30 @@ class EventNotifier extends Notifier<EventState> {
     try {
       final res = await _repo.unregisterFromEvent(eventId);
       if (res.success) {
-        final updated = state.events.map((e) {
-          if (e.id == eventId) {
-            return e.copyWith(
-              isRegistered: false,
-              registeredCount: (e.registeredCount - 1).clamp(0, 999999),
-            );
-          }
-          return e;
-        }).toList();
-        state = state.copyWith(events: updated);
+        state = state.copyWith(
+          events: _applyRegistration(state.events, eventId, false),
+          featuredEvents: _applyRegistration(state.featuredEvents, eventId, false),
+        );
+        loadMyEvents();
         return true;
       }
       return false;
     } catch (_) {
       return false;
     }
+  }
+
+  List<Event> _applyRegistration(
+      List<Event> events, String eventId, bool registered) {
+    return events.map((e) {
+      if (e.id != eventId) return e;
+      return e.copyWith(
+        isRegistered: registered,
+        registeredCount: registered
+            ? e.registeredCount + 1
+            : (e.registeredCount > 0 ? e.registeredCount - 1 : 0),
+      );
+    }).toList();
   }
 
   // ── View helpers ──────────────────────────────────────────────────────────

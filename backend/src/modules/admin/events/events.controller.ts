@@ -2,6 +2,7 @@ import { Response, NextFunction } from 'express';
 import { adminEventsService } from './events.service';
 import { ApiResponse } from '../../../utils/apiResponse';
 import { AuthRequest } from '../../../middleware/auth';
+import { notifyNewEvent } from '../../../services/notification.triggers';
 
 function cid(req: AuthRequest): string | null | undefined {
   if (req.user?.role === 'SUPER_ADMIN') {
@@ -27,7 +28,12 @@ export const eventsController = {
   },
 
   async create(req: AuthRequest, res: Response, next: NextFunction) {
-    try { ApiResponse.created(res, await adminEventsService.create(cid(req), req.body)); } catch (e) { next(e); }
+    try {
+      const churchId = cid(req);
+      const event = await adminEventsService.create(churchId, req.body);
+      ApiResponse.created(res, event);
+      if (churchId) notifyNewEvent(churchId, event.id, event.title, event.startDate).catch(() => {});
+    } catch (e) { next(e); }
   },
 
   async update(req: AuthRequest, res: Response, next: NextFunction) {

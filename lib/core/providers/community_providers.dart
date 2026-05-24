@@ -30,19 +30,29 @@ final groupDetailProvider =
 // ── Group membership notifier ─────────────────────────────────────────────────
 
 class GroupMembershipNotifier extends StateNotifier<bool> {
-  GroupMembershipNotifier(this._repo, this._groupId) : super(false);
+  GroupMembershipNotifier(this._repo, this._ref, this._groupId) : super(false);
 
   final CommunityRepository _repo;
+  final Ref _ref;
   final String _groupId;
 
   Future<void> join() async {
     final res = await _repo.joinGroup(_groupId);
-    if (res.success && mounted) state = true;
+    if (res.success && mounted) {
+      state = true;
+      // Invalidate both the detail and the list so both screens reflect membership
+      _ref.invalidate(groupDetailProvider(_groupId));
+      _ref.invalidate(groupsProvider);
+    }
   }
 
   Future<void> leave() async {
     final res = await _repo.leaveGroup(_groupId);
-    if (res.success && mounted) state = false;
+    if (res.success && mounted) {
+      state = false;
+      _ref.invalidate(groupDetailProvider(_groupId));
+      _ref.invalidate(groupsProvider);
+    }
   }
 }
 
@@ -50,6 +60,7 @@ final groupMembershipProvider =
     StateNotifierProvider.family<GroupMembershipNotifier, bool, String>(
   (ref, groupId) => GroupMembershipNotifier(
     ref.read(communityRepositoryProvider),
+    ref,
     groupId,
   ),
 );

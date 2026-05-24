@@ -46,14 +46,24 @@ class PrayerRequestsNotifier extends Notifier<List<PrayerRequest>> {
   }
 
   Future<void> prayFor(String id) async {
-    await ref.read(prayerRepositoryProvider).prayForRequest(id);
+    // Optimistic update — feels instant to the user
     state = state.map((r) {
       if (r.id != id) return r;
-      return r.copyWith(
-        hasPrayed: true,
-        prayerCount: r.prayerCount + 1,
-      );
+      return r.copyWith(hasPrayed: true, prayerCount: r.prayerCount + 1);
     }).toList();
+
+    try {
+      await ref.read(prayerRepositoryProvider).prayForRequest(id);
+    } catch (_) {
+      // Revert on failure
+      state = state.map((r) {
+        if (r.id != id) return r;
+        return r.copyWith(
+          hasPrayed: false,
+          prayerCount: r.prayerCount > 0 ? r.prayerCount - 1 : 0,
+        );
+      }).toList();
+    }
   }
 }
 

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/navigation/app_routes.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/push_notification_service.dart';
 import '../../core/theme/theme.dart';
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -83,9 +84,16 @@ class _SplashScreenState extends State<SplashScreen>
       case AuthState.needsSetup:
         context.go(AppRoutes.churchCode);
       case AuthState.authenticated:
-        context.go(AppRoutes.home);
+        // If the app was launched by tapping a push notification, deep-link
+        // directly to the relevant screen instead of just going to /home.
+        final push = PushNotificationService.instance;
+        final deepLink = push.extractDeepLink(push.initialMessage);
+        if (deepLink != null) {
+          context.go(deepLink);
+        } else {
+          context.go(AppRoutes.home);
+        }
       case AuthState.unknown:
-        // Fallback — should not happen after init().
         context.go(AppRoutes.onboarding);
     }
   }

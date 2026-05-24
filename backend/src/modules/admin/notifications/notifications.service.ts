@@ -1,6 +1,7 @@
 import prisma from '../../../config/database';
 import { ApiError } from '../../../utils/apiError';
 import { NotificationType } from '../../../generated/prisma/client';
+import { notificationService } from '../../../services/notification.service';
 
 function cw(churchId: string | null | undefined) { return churchId ? { churchId } : {}; }
 
@@ -25,17 +26,18 @@ export const adminNotificationsService = {
 
   async sendToAll(churchId: string | null | undefined, data: { type: NotificationType; title: string; body: string; entityId?: string; entityType?: string }) {
     if (!churchId) throw ApiError.badRequest('Church context required');
-    const members = await prisma.user.findMany({ where: { churchId, isActive: true }, select: { id: true } });
-    if (members.length === 0) return { sent: 0 };
-    const notifData = members.map(m => ({
-      userId: m.id,
+    // Use the real notification service: creates DB records + Socket.io emit + FCM push
+    await notificationService.sendToChurch(churchId, {
       type: data.type,
       title: data.title,
       body: data.body,
-      data: { entityId: data.entityId ?? '', entityType: data.entityType ?? '' },
-    }));
-    const result = await prisma.notification.createMany({ data: notifData });
-    return { sent: result.count };
+      data: {
+        entityId: data.entityId ?? '',
+        entityType: data.entityType ?? '',
+      },
+    });
+    const count = await prisma.user.count({ where: { churchId, isActive: true } });
+    return { sent: count };
   },
 
   async deleteNotification(id: string) {

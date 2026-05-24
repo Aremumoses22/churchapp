@@ -847,6 +847,29 @@ export async function notifyNewSermon(
   }
 }
 
+export async function notifyNewEvent(
+  churchId: string,
+  eventId: string,
+  eventTitle: string,
+  startDate: Date,
+): Promise<void> {
+  try {
+    const dateStr = startDate.toLocaleDateString('en-NG', { weekday: 'short', month: 'short', day: 'numeric' });
+    await notificationService.sendToChurch(churchId, {
+      type: 'EVENT',
+      title: '📅 New Event',
+      body: `"${eventTitle}" — ${dateStr}. Tap to register.`,
+      data: {
+        entityId: eventId,
+        entityType: 'event',
+        deepLink: `${env.deepLinkScheme}://events/${eventId}`,
+      },
+    });
+  } catch (error) {
+    logger.error('notifyNewEvent failed:', error);
+  }
+}
+
 export async function notifyWelcome(
   userId: string,
   churchName: string,
