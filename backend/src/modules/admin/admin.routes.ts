@@ -12,6 +12,8 @@ import prayerRoutes from './prayer/prayer.routes';
 import liveRoutes from './live/live.routes';
 import forumRoutes from './forum/forum.routes';
 import notificationsRoutes from './notifications/notifications.routes';
+import kidsRoutes from './kids/kids.routes';
+import volunteerRoutes from './volunteer/volunteer.routes';
 
 const router = Router();
 
@@ -28,5 +30,7 @@ router.use('/prayer', prayerRoutes);
 router.use('/live', liveRoutes);
 router.use('/forum', forumRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/kids', kidsRoutes);
+router.use('/volunteer', volunteerRoutes);
 
 export default router;
