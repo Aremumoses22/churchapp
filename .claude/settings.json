@@ -41,7 +41,22 @@
       "Bash(sed -n '666,712p' \"/Users/mbp/Documents/Practice/Church App/churchapp/backend/prisma/schema.prisma\")",
       "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/create\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/series\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/sermons/[id]/edit\")",
       "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/create\" \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/[id]/edit\")",
-      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/[id]/registrations\")"
+      "Bash(mkdir -p \"/Users/mbp/Documents/Practice/Church App/churchapp/admin/app/\\(dashboard\\)/events/[id]/registrations\")",
+      "Bash(dart pub *)",
+      "Bash(firebase projects:list)",
+      "Bash(firebase --version)",
+      "Bash(ruby --version)",
+      "Bash(gem list *)",
+      "Bash(sudo gem install xcodeproj)",
+      "Bash(gem install *)",
+      "Bash(flutter devices *)",
+      "Bash(ipconfig getifaddr *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://192.168.3.31:8080/health)",
+      "Bash(curl -s http://192.168.3.31:8080/health)",
+      "Bash(/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate)",
+      "Bash(/usr/libexec/ApplicationFirewall/socketfilterfw --getblockall)",
+      "Bash(networksetup -listallhardwareports)",
+      "Bash(/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I)"
     ],
     "additionalDirectories": [
       "/Users/mbp/Documents/Practice/Church App",

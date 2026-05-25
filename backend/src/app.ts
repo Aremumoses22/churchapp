@@ -42,6 +42,8 @@ import savedItemsRoutes from './modules/saved-items/saved-items.routes';
 
 // Admin dashboard
 import adminRoutes from './modules/admin/admin.routes';
+// Super admin
+import superAdminRoutes from './modules/super-admin/super-admin.routes';
 
 const app = express();
 
@@ -124,6 +126,8 @@ app.use(`${apiPrefix}/saved-items`, savedItemsRoutes);
 
 // Admin dashboard
 app.use(`${apiPrefix}/admin`, adminRoutes);
+// Super admin (platform-level, SUPER_ADMIN role only)
+app.use(`${apiPrefix}/super-admin`, superAdminRoutes);
 
 // ── Error handling ──────────────────────────────────
 app.use(notFoundHandler);

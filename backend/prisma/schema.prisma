@@ -31,6 +31,9 @@ model Church {
   coverImageUrl String?  @map("cover_image_url") @db.VarChar(500)
   socialLinks   Json     @default("{}") @map("social_links")    // {facebook, instagram, youtube, twitter}
   settings      Json     @default("{}") @map("settings")        // feature flags, branding colors, etc.
+  isActive      Boolean  @default(true) @map("is_active")
+  suspendedAt   DateTime? @map("suspended_at") @db.Timestamptz()
+  suspendReason String?  @map("suspend_reason") @db.Text
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 

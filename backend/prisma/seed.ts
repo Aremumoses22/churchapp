@@ -65,6 +65,23 @@ async function seed() {
   });
   console.log(`  ✅ Church: ${church.name} (code: ${church.code})`);
 
+  // ── Super Admin (platform-level, no churchId) ─────────────────
+  const superAdminHash = await bcrypt.hash('SuperAdmin@123', 12);
+  const superAdmin = await prisma.user.upsert({
+    where: { email: 'superadmin@churchapp.com' },
+    update: {},
+    create: {
+      email: 'superadmin@churchapp.com',
+      passwordHash: superAdminHash,
+      name: 'Super Admin',
+      role: 'SUPER_ADMIN',
+      emailVerified: true,
+      hasCompletedSetup: true,
+      churchId: null,
+    },
+  });
+  console.log(`  ✅ Super Admin: ${superAdmin.email} (password: SuperAdmin@123)`);
+
   const adminPasswordHash = await bcrypt.hash('Admin@123', 12);
   const admin = await prisma.user.upsert({
     where: { email: 'admin@gracecommunity.app' },

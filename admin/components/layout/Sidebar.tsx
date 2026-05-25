@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard, Users, BookOpen, Calendar, HandCoins,
   Users2, Heart, MessageSquare, Image, Radio, Bell,
-  UserCheck, Baby, Building2, Church, ChevronRight, LogOut,
+  UserCheck, Baby, Building2, Church, ChevronRight, LogOut, Shield,
 } from 'lucide-react';
 import { useAdminUser, useAdminLogout } from '@/hooks/useAdmin';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -102,6 +102,20 @@ export function Sidebar({ collapsed = false }: SidebarProps) {
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
         {NAV_ITEMS.map(({ label, href, icon }) => renderNavItem(label, href, icon))}
+
+        {/* Super Admin section — only visible to SUPER_ADMIN */}
+        {user?.role === 'SUPER_ADMIN' && (
+          <>
+            <div className={cn('mt-3 mb-1', collapsed ? 'px-1' : 'px-2')}>
+              {!collapsed && (
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                  Platform Admin
+                </p>
+              )}
+            </div>
+            {renderNavItem('Manage Churches', '/super-admin', Shield)}
+          </>
+        )}
       </nav>
 
       <Separator className="bg-slate-800" />

@@ -6,12 +6,13 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 abstract final class ApiConfig {
-  /// For iOS simulator: use localhost.
-  /// For Android emulator: use 10.0.2.2 instead.
-  static const String baseUrl = 'http://localhost:8080/api/v1';
+  /// Physical device: use your Mac's LAN IP (e.g. 192.168.3.31).
+  /// iOS simulator / macOS: use localhost.
+  /// Android emulator: use 10.0.2.2.
+  static const String baseUrl = 'http://192.168.3.31:8080/api/v1';
 
   /// WebSocket URL (Socket.io).
-  static const String wsUrl = 'ws://localhost:8080';
+  static const String wsUrl = 'ws://192.168.3.31:8080';
 
   /// Request timeout durations.
   static const Duration connectTimeout = Duration(seconds: 15);

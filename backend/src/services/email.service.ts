@@ -356,4 +356,34 @@ export const emailService = {
       `,
     });
   },
+
+  async sendChurchAdminWelcome(opts: {
+    to: string;
+    adminName: string;
+    churchName: string;
+    churchCode: string;
+    adminPassword: string;
+  }): Promise<boolean> {
+    return sendEmail({
+      to: opts.to,
+      subject: `Welcome to ${env.appName} — Your church is ready!`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Welcome, ${opts.adminName}! 🎉</h2>
+          <p>Your church <strong>${opts.churchName}</strong> has been set up on ${env.appName}.</p>
+          <p>Here are your admin credentials:</p>
+          <div style="background: #f0f4ff; border-left: 4px solid #4f46e5; padding: 16px; border-radius: 4px; margin: 16px 0;">
+            <p style="margin: 4px 0;"><strong>Admin Dashboard:</strong> ${(env as any).appUrl ?? 'https://admin.churchapp.com'}</p>
+            <p style="margin: 4px 0;"><strong>Email:</strong> ${opts.to}</p>
+            <p style="margin: 4px 0;"><strong>Temporary Password:</strong> ${opts.adminPassword}</p>
+          </div>
+          <div style="background: #ecfdf5; border-left: 4px solid #059669; padding: 16px; border-radius: 4px; margin: 16px 0;">
+            <p style="margin: 0; font-size: 18px;"><strong>Church Code: <span style="letter-spacing: 2px; color: #059669;">${opts.churchCode}</span></strong></p>
+            <p style="margin: 8px 0 0; font-size: 13px; color: #6b7280;">Share this code with your members so they can join your church on the mobile app.</p>
+          </div>
+          <p style="color: #dc2626;">⚠️ Please change your password after your first login.</p>
+        </div>
+      `,
+    });
+  },
 };

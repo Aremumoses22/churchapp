@@ -21,6 +21,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/volunteer': 'Volunteer',
   '/kids': "Kid's Check-In",
   '/church': 'Church Settings',
+  '/super-admin': 'Super Admin — Church Management',
 };
 
 function getTitle(pathname: string): string {

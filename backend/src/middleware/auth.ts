@@ -50,11 +50,19 @@ export async function authenticate(
     // Verify user still exists and is active
     const user = await prisma.user.findUnique({
       where: { id: decoded.sub },
-      select: { id: true, email: true, role: true, churchId: true, isActive: true },
+      select: {
+        id: true, email: true, role: true, churchId: true, isActive: true,
+        church: { select: { isActive: true } },
+      },
     });
 
     if (!user || !user.isActive) {
       throw ApiError.unauthorized('User not found or inactive');
+    }
+
+    // Block non-super-admins whose church has been suspended
+    if (user.role !== 'SUPER_ADMIN' && user.church && !user.church.isActive) {
+      throw ApiError.forbidden('Your church account has been suspended. Please contact support.');
     }
 
     // Attach user to request
