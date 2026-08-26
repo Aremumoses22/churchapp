@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../core/providers/live_providers.dart';
 import '../../core/theme/theme.dart';
@@ -83,6 +84,7 @@ class _LiveServiceScreenState extends ConsumerState<LiveServiceScreen>
             _VideoPlayer(
               pulseAnim: _pulseAnim,
               viewerCount: viewerCount,
+              streamUrl: live?.current?.streamUrl,
               onBack: () => context.pop(),
             ),
 
@@ -220,16 +222,67 @@ class AnimatedBuilder extends AnimatedWidget {
 
 // ── Video Player ────────────────────────────────────────────────────────────
 
-class _VideoPlayer extends StatelessWidget {
+class _VideoPlayer extends StatefulWidget {
   const _VideoPlayer({
     required this.pulseAnim,
     required this.viewerCount,
     required this.onBack,
+    this.streamUrl,
   });
 
   final Animation<double> pulseAnim;
   final int viewerCount;
   final VoidCallback onBack;
+  final String? streamUrl;
+
+  @override
+  State<_VideoPlayer> createState() => _VideoPlayerState();
+}
+
+class _VideoPlayerState extends State<_VideoPlayer> {
+  WebViewController? _webViewController;
+
+  @override
+  void initState() {
+    super.initState();
+    _initPlayer(widget.streamUrl);
+  }
+
+  @override
+  void didUpdateWidget(_VideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.streamUrl != widget.streamUrl) {
+      _initPlayer(widget.streamUrl);
+    }
+  }
+
+  void _initPlayer(String? url) {
+    if (url == null) return;
+    final videoId = _extractYouTubeId(url);
+    if (videoId == null) return;
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..loadRequest(Uri.parse(
+        'https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0',
+      ));
+    setState(() => _webViewController = controller);
+  }
+
+  static String? _extractYouTubeId(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return null;
+    if (uri.host.contains('youtube.com')) {
+      if (uri.pathSegments.length >= 2 && uri.pathSegments[0] == 'embed') {
+        return uri.pathSegments[1];
+      }
+      return uri.queryParameters['v'];
+    }
+    if (uri.host == 'youtu.be') {
+      return uri.pathSegments.isNotEmpty ? uri.pathSegments.first : null;
+    }
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -239,17 +292,20 @@ class _VideoPlayer extends StatelessWidget {
         color: Colors.black,
         child: Stack(
           children: [
-            // Placeholder for video stream
-            const Center(
-              child: Icon(Icons.live_tv, color: Colors.white38, size: 64),
-            ),
+            // Real YouTube player or placeholder
+            if (_webViewController != null)
+              WebViewWidget(controller: _webViewController!)
+            else
+              const Center(
+                child: CircularProgressIndicator(color: Colors.white54),
+              ),
 
             // Back button
             Positioned(
               top: 8,
               left: 8,
               child: GestureDetector(
-                onTap: onBack,
+                onTap: widget.onBack,
                 child: Container(
                   width: 36,
                   height: 36,
@@ -276,9 +332,9 @@ class _VideoPlayer extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     AnimatedBuilder(
-                      listenable: pulseAnim,
-                      builder: (_, __) => Transform.scale(
-                        scale: pulseAnim.value,
+                      listenable: widget.pulseAnim,
+                      builder: (_, _) => Transform.scale(
+                        scale: widget.pulseAnim.value,
                         child: Container(
                           width: 6,
                           height: 6,
@@ -297,37 +353,6 @@ class _VideoPlayer extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Bottom controls
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.6),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.play_arrow, color: Colors.white, size: 28),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.volume_up, color: Colors.white, size: 22),
-                    const Spacer(),
-                    const Icon(Icons.cast, color: Colors.white, size: 22),
-                    const SizedBox(width: 12),
-                    const Icon(Icons.fullscreen, color: Colors.white, size: 24),
                   ],
                 ),
               ),

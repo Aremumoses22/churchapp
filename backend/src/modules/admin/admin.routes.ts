@@ -14,6 +14,7 @@ import forumRoutes from './forum/forum.routes';
 import notificationsRoutes from './notifications/notifications.routes';
 import kidsRoutes from './kids/kids.routes';
 import volunteerRoutes from './volunteer/volunteer.routes';
+import announcementsRoutes from './announcements/announcements.routes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/forum', forumRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/kids', kidsRoutes);
 router.use('/volunteer', volunteerRoutes);
+router.use('/announcements', announcementsRoutes);
 
 export default router;

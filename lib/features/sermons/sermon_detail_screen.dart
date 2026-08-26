@@ -167,10 +167,18 @@ class _SermonDetailScreenState extends ConsumerState<SermonDetailScreen> {
                               label: 'Play',
                               isDark: isDark,
                               onTap: () {
-                                setState(() => _isPlaying = !_isPlaying);
-                                ref
-                                    .read(sermonNotifierProvider.notifier)
-                                    .setNowPlaying(sermon);
+                                if (sermon.videoUrl != null) {
+                                  context.push(
+                                    '/video-player?id=${sermon.id}'
+                                    '&title=${Uri.encodeComponent(sermon.title)}'
+                                    '&speaker=${Uri.encodeComponent(sermon.speaker)}',
+                                  );
+                                } else {
+                                  setState(() => _isPlaying = !_isPlaying);
+                                  ref
+                                      .read(sermonNotifierProvider.notifier)
+                                      .setNowPlaying(sermon);
+                                }
                               },
                             ),
                             _ActionIcon(
@@ -288,7 +296,7 @@ class _SermonDetailScreenState extends ConsumerState<SermonDetailScreen> {
                           child: AppFeatureCard(
                             title: rel.title,
                             subtitle:
-                                '${rel.speaker ?? ''} · ${rel.durationFormatted}',
+                                '${rel.speaker} · ${rel.durationFormatted}',
                             onTap: () => context.push('/sermons/${rel.id}'),
                           ),
                         );

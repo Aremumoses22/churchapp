@@ -65,7 +65,7 @@ export const pushService = {
         android: {
           priority: 'high',
           notification: {
-            channelId: payload.data?.category || 'general',
+            channelId: 'high_importance_channel',
             sound: 'default',
           },
         },
@@ -117,6 +117,18 @@ export const pushService = {
             imageUrl: payload.imageUrl,
           },
           data: payload.data,
+          android: {
+            priority: 'high' as const,
+            notification: {
+              channelId: 'high_importance_channel',
+              sound: 'default',
+            },
+          },
+          apns: {
+            payload: {
+              aps: { sound: 'default' },
+            },
+          },
         }));
 
         const response = await messaging.sendEach(messages);

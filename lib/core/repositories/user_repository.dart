@@ -72,7 +72,7 @@ class UserRepository {
   // ── PUT /users/me/fcm-token ───────────────────────────────────────────────
   Future<ApiResponse<void>> registerFcmToken(String token) async {
     final res =
-        await _dio.put(Endpoints.fcmToken, data: {'token': token});
+        await _dio.put(Endpoints.fcmToken, data: {'fcmToken': token});
     return ApiResponse.fromJson(
       res.data as Map<String, dynamic>,
       fromJsonT: (_) {},

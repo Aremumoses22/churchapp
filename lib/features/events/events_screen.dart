@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -978,7 +979,7 @@ class _EventCardState extends State<_EventCard>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Banner image placeholder
+            // Banner image
             Container(
               height: 160,
               width: double.infinity,
@@ -992,11 +993,23 @@ class _EventCardState extends State<_EventCard>
               ),
               child: Stack(
                 children: [
-                  Center(
-                    child: Icon(Icons.event,
-                        color: Colors.white.withValues(alpha: 0.3),
-                        size: 64),
-                  ),
+                  if (widget.event.imageUrl != null)
+                    Positioned.fill(
+                      child: ClipRRect(
+                        child: CachedNetworkImage(
+                          imageUrl: widget.event.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, _) => const SizedBox.shrink(),
+                          errorWidget: (_, _, _) => const SizedBox.shrink(),
+                        ),
+                      ),
+                    )
+                  else
+                    Center(
+                      child: Icon(Icons.event,
+                          color: Colors.white.withValues(alpha: 0.3),
+                          size: 64),
+                    ),
                   Positioned(
                     top: 8,
                     right: 8,

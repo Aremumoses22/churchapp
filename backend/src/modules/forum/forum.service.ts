@@ -1,6 +1,6 @@
 import prisma from '../../config/database';
 import { ApiError } from '../../utils/apiError';
-import { notifyForumReply, notifyForumThreadLike, notifyForumReplyLike } from '../../services/notification.triggers';
+import { notifyNewForumThread, notifyForumReply, notifyForumThreadLike, notifyForumReplyLike } from '../../services/notification.triggers';
 
 // ── Categories ──────────────────────────────────────
 async function getCategories(churchId: string) {
@@ -186,6 +186,8 @@ async function createThread(
       data: { threadCount: { increment: 1 } },
     }),
   ]);
+
+  notifyNewForumThread(thread.id, userId).catch(() => {});
 
   return {
     ...thread,

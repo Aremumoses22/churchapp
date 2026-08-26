@@ -361,6 +361,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           title: evt.title,
                           date: evt.dateFormatted,
                           location: evt.location ?? '',
+                          imageUrl: evt.imageUrl,
                           width: 220,
                           onTap: () =>
                               context.push('/events/${evt.id}'),
@@ -391,7 +392,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   ? AppFeatureCard(
                       title: latestSermon.title,
                       subtitle:
-                          '${latestSermon.speaker ?? 'Unknown'} \u00b7 ${latestSermon.durationFormatted}',
+                          '${latestSermon.speaker} \u00b7 ${latestSermon.durationFormatted}',
                       thumbnailIcon: latestSermon.thumbnailUrl != null
                           ? Image.network(latestSermon.thumbnailUrl!,
                               fit: BoxFit.cover)

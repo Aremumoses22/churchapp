@@ -353,6 +353,39 @@ export async function notifyTestimonyReaction(
 // FORUM (Phase 4)
 // ═══════════════════════════════════════════════════════════════
 
+export async function notifyNewForumThread(
+  threadId: string,
+  authorId: string,
+): Promise<void> {
+  try {
+    const [thread, author] = await Promise.all([
+      prisma.forumThread.findUnique({
+        where: { id: threadId },
+        select: { churchId: true, title: true, category: { select: { name: true } } },
+      }),
+      prisma.user.findUnique({
+        where: { id: authorId },
+        select: { name: true },
+      }),
+    ]);
+
+    if (!thread || !author) return;
+
+    await notificationService.sendToChurch(thread.churchId, {
+      type: 'FORUM',
+      title: `💬 New Discussion in ${thread.category?.name ?? 'Forum'}`,
+      body: `${author.name}: "${thread.title}"`,
+      data: {
+        entityId: threadId,
+        entityType: 'forum_thread',
+        deepLink: `${env.deepLinkScheme}://forum/thread/${threadId}`,
+      },
+    }, authorId);
+  } catch (error) {
+    logger.error('notifyNewForumThread failed:', error);
+  }
+}
+
 export async function notifyForumReply(
   threadId: string,
   replyAuthorId: string,

@@ -381,28 +381,40 @@ class _SermonCardState extends State<_SermonCard> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      CachedNetworkImage(
-                        imageUrl:
-                            'https://picsum.photos/seed/sermon_${widget.sermon.id}/160/168',
-                        fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(
-                          color: widget.isDark
-                              ? AppColors.skyDark
-                              : AppColors.skyLight,
-                        ),
-                        errorWidget: (_, __, ___) => Container(
-                          color: widget.isDark
-                              ? AppColors.skyDark
-                              : AppColors.skyLight,
-                          child: Icon(
-                            Icons.headphones_outlined,
-                            size: 28,
-                            color: widget.isDark
-                                ? AppColors.primaryLight
-                                : AppColors.primary,
-                          ),
-                        ),
-                      ),
+                      widget.sermon.thumbnailUrl != null
+                          ? CachedNetworkImage(
+                              imageUrl: widget.sermon.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => Container(
+                                color: widget.isDark
+                                    ? AppColors.skyDark
+                                    : AppColors.skyLight,
+                              ),
+                              errorWidget: (_, _, _) => Container(
+                                color: widget.isDark
+                                    ? AppColors.skyDark
+                                    : AppColors.skyLight,
+                                child: Icon(
+                                  Icons.headphones_outlined,
+                                  size: 28,
+                                  color: widget.isDark
+                                      ? AppColors.primaryLight
+                                      : AppColors.primary,
+                                ),
+                              ),
+                            )
+                          : Container(
+                              color: widget.isDark
+                                  ? AppColors.skyDark
+                                  : AppColors.skyLight,
+                              child: Icon(
+                                Icons.headphones_outlined,
+                                size: 28,
+                                color: widget.isDark
+                                    ? AppColors.primaryLight
+                                    : AppColors.primary,
+                              ),
+                            ),
                       // Overlay
                       Container(
                         color: Colors.black.withValues(alpha: 0.25),

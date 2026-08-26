@@ -217,7 +217,11 @@ class PushNotificationService {
       case 'live':
         return '/live';
       case 'announcement':
-        return '/home';
+        return entityId != null ? '/announcements/$entityId' : '/announcements';
+      case 'forum_thread':
+        return entityId != null ? '/forum/thread/$entityId' : '/forum';
+      case 'chat':
+        return entityId != null ? '/chat/$entityId' : '/chat';
       case 'prayer':
         return '/prayer-requests';
       case 'group':
